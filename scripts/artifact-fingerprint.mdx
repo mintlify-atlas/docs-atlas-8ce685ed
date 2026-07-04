@@ -1,17 +1,17 @@
 ---
 title: "artifact_fingerprint.py: File Size, Mtime, and SHA-256"
-sidebarTitle: "artifact_fingerprint.py"
+sidebarTitle: "Artifact Fingerprint"
 description: "Emit path, size, mtime, and SHA-256 fingerprints for files or directories. Use to anchor source identity before treating extracted surfaces as L0."
 ---
 
 `artifact_fingerprint.py` produces a JSON array of mechanical fingerprints for
-one or more files or directories. For each path it emits the absolute path,
-existence flag, file/directory type, size in bytes, last-modified time in UTC
-ISO-8601 format, and a SHA-256 hex digest. Fingerprinting is the recommended
-first step when a bundle zip arrives in `/mnt/data` — recording the hash before
-extraction anchors the source identity required for treating extracted surfaces
-as L0. The script does not classify provenance; it only records facts about the
-file system.
+one or more files or directories. For each path it emits the path as given on
+the command line, an existence flag, file/directory type, size in bytes,
+last-modified time in UTC ISO-8601 format, and a SHA-256 hex digest.
+Fingerprinting is the recommended first step when a bundle zip arrives in
+`/mnt/data` — recording the hash before extraction anchors the source identity
+required for treating extracted surfaces as L0. The script does not classify
+provenance; it only records facts about the file system.
 
 ## Usage
 

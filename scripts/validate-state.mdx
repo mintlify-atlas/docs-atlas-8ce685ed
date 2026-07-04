@@ -1,6 +1,6 @@
 ---
 title: "validate_state.py: Validate SESSION_STATE and State Deltas"
-sidebarTitle: "validate_state.py"
+sidebarTitle: "Validate State"
 description: "Mechanically validate SESSION_STATE.json and CANON_STATE_DELTA.json files against their schemas. Supports plain-text and JSON report output."
 ---
 
@@ -36,14 +36,19 @@ python scripts/validate_state.py --state /path/to/SESSION_STATE.json --json
 ## Arguments
 
 <ParamField path="--state" type="Path">
-  Path to the `SESSION_STATE.json` file to validate. At least one of `--state`
-  or `--delta` must be provided.
+  Path to the `SESSION_STATE.json` file to validate.
 </ParamField>
 
 <ParamField path="--delta" type="Path">
   Path to the `CANON_STATE_DELTA.json` file to validate. Can be combined with
   `--state` to validate both files in a single run.
 </ParamField>
+
+<Warning>
+  If both `--state` and `--delta` are omitted, the script calls
+  `parser.error()` and exits immediately with a usage error. At least one of
+  the two flags must be supplied.
+</Warning>
 
 <ParamField path="--json" type="flag">
   Emit a JSON validation report to stdout instead of the default plain-text
@@ -59,11 +64,11 @@ When validation passes, the script prints `valid` and exits with code `0`. When
 validation fails, it prints `invalid` followed by a bullet list of error
 messages, and exits with code `1`.
 
-```
+```text
 valid
 ```
 
-```
+```text
 invalid
 - SESSION_STATE: missing required key: state_seq
 - SESSION_STATE: unexpected key: legacy_field
@@ -112,7 +117,11 @@ its dot-notation path and message.
 ### Strict manual fallback
 
 When `jsonschema` is not available, the script runs its own recursive validator.
-It supports exactly the schema keywords used by the Canon Boundary Guard schemas:
+The full set of accepted schema keywords is `$schema`, `title`, `description`,
+`type`, `required`, `properties`, `additionalProperties`, `const`, `enum`,
+`minimum`, and `items`. Keywords not in this set cause the validator to fail
+closed immediately. Of the accepted keywords, the following are actively
+enforced:
 
 | Keyword | What is checked |
 |---|---|
@@ -125,9 +134,13 @@ It supports exactly the schema keywords used by the Canon Boundary Guard schemas
 | `properties` | Recursively validates each present property |
 | `items` | Recursively validates each element in an array |
 
-If the schema contains a keyword outside this set, the validator returns an
-`unsupported schema keyword` error and **fails closed** — it does not silently
-skip unknown constraints.
+The keywords `$schema`, `title`, and `description` are accepted (not treated as
+unsupported) but no validation logic is applied to them — they are structural
+annotations only.
+
+If the schema contains a keyword outside the accepted set, the validator returns
+an `unsupported schema keyword` error and **fails closed** — it does not
+silently skip unknown constraints.
 
 ### Delta cross-file check
 

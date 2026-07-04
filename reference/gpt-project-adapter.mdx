@@ -1,7 +1,7 @@
 ---
-title: "GPT Project Adapter: Simulated Gate Architecture"
+title: "GPT Project Adapter: Simulated Persistence Gate Reference"
 sidebarTitle: "GPT Project Adapter"
-description: "How Canon Boundary Guard simulates a semantic persistence gate in GPT Projects, including bootstrap, runtime zones, persistence boundaries, and save labels."
+description: "How Canon Boundary Guard simulates a semantic persistence gate in GPT Projects, covering bootstrap, runtime zones, persistence boundaries, and save labels."
 ---
 
 Codex can inject context before write operations through PreToolUse hooks — a native mechanism that intercepts writes at the tooling level. GPT Projects do not expose an equivalent user-defined pre-write hook. The GPT Project Adapter addresses this gap by defining a simulated semantic persistence boundary: a set of protocol rules, runtime zones, and deterministic labels that the assistant applies before producing any output intended for persistence. The gate is not enforced by the platform; it is enforced by strict adherence to the protocol at the moment content would otherwise be written.
@@ -14,7 +14,7 @@ The Canon Boundary Guard package for GPT Projects is distributed as a zip contai
 
 At runtime, the assistant must locate the bundle through available Project Source retrieval and/or `/mnt/data`. The expected inspected entrypoint is:
 
-```
+```text
 canon-boundary-guard-gpt/SKILL.md
 ```
 
