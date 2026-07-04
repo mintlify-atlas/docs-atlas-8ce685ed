@@ -1,0 +1,328 @@
+---
+title: "SESSION_STATE Schema Reference"
+sidebarTitle: "SESSION_STATE"
+description: "Complete field-by-field reference for SESSION_STATE, covering nested object shapes, a full example, validation commands, and durability options."
+---
+
+`SESSION_STATE` is the live working-state document for a Canon Boundary Guard session. It is written to `/mnt/data/_SESSION_STATE.json` during a session and tracks every L0 source inspected, every delta the operator has authorized, every unresolved conflict, every pending decision, and every artifact written through the persistence gate. Because ChatGPT's `/mnt/data/` storage is ephemeral, **SESSION_STATE is not durable by itself** — it must be explicitly exported or saved to become a durable record.
+
+## Protocol identity
+
+| Field | Value |
+|---|---|
+| `protocol` | `canon-boundary-guard:gpt-project-adapter` |
+| `protocol_version` | `1.1` |
+| JSON Schema draft | `2020-12` |
+| Validate against | `schemas/SESSION_STATE.schema.json` |
+
+## Schema-minimal shape
+
+This is the smallest valid SESSION_STATE — an empty-but-valid skeleton. It is **not** a first-install template; use it only to understand the required structure.
+
+```json
+{
+  "protocol": "canon-boundary-guard:gpt-project-adapter",
+  "protocol_version": "1.1",
+  "state_seq": 0,
+  "updated_at": "ISO-8601",
+  "active_l0_sources": [],
+  "authorized_deltas": [],
+  "open_conflicts": [],
+  "pending_decisions": [],
+  "last_persistent_artifacts": [],
+  "last_state_hash": "sha256:optional"
+}
+```
+
+## Required fields
+
+<ResponseField name="protocol" type="string" required>
+  Protocol identifier. Must be the constant string `"canon-boundary-guard:gpt-project-adapter"`. Rejects any document that belongs to a different protocol family.
+</ResponseField>
+
+<ResponseField name="protocol_version" type="string" required>
+  Schema version. Must be the constant string `"1.1"`. Used to detect stale state files written by an earlier version of the bundle.
+</ResponseField>
+
+<ResponseField name="state_seq" type="integer" required>
+  Monotonically incrementing sequence number. Starts at `0` on first install and increments by 1 after every state-changing decision. Minimum value is `0`. The sequence number in a `CANON_STATE_DELTA` must equal the `state_seq` of the embedded `current_state`.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string" required>
+  ISO-8601 timestamp recording when the state was last modified. Updated every time `state_seq` advances.
+</ResponseField>
+
+<ResponseField name="active_l0_sources" type="array of objects" required>
+  List of every L0 source that has been inspected or registered in this session. An L0 source is any file, artifact, or output that the protocol treats as ground truth — only these can be read without a gate decision. See [nested object shape](#active_l0_sources-items) below.
+</ResponseField>
+
+<ResponseField name="authorized_deltas" type="array of objects" required>
+  Deltas the operator has explicitly authorized for persistence in the current session. Each entry records the scope and current persistence status of one operator decision. See [nested object shape](#authorized_deltas-items) below.
+</ResponseField>
+
+<ResponseField name="open_conflicts" type="array of objects" required>
+  Conflicts that have been detected between sources or decisions but have not yet been resolved. A non-empty array blocks certain Mode C operations until conflicts are closed or deferred. See [nested object shape](#open_conflicts-items) below.
+</ResponseField>
+
+<ResponseField name="pending_decisions" type="array of objects" required>
+  Decisions the operator must make before work can continue. Blocking decisions halt forward progress; non-blocking ones are queued. See [nested object shape](#pending_decisions-items) below.
+</ResponseField>
+
+<ResponseField name="last_persistent_artifacts" type="array of objects" required>
+  Artifacts written through the persistence gate in this session. Each entry provides a stable audit trail linking an artifact back to the delta that authorized it. See [nested object shape](#last_persistent_artifacts-items) below.
+</ResponseField>
+
+<ResponseField name="last_state_hash" type="string">
+  Optional. SHA-256 hash of the previous state object, used for integrity verification when chaining deltas. Format: `"sha256:<hex>"`. When present, `validate_state.py` checks that the hash matches the prior serialized state.
+</ResponseField>
+
+---
+
+## Nested object shapes
+
+### `active_l0_sources` items
+
+<ResponseField name="source_id" type="string" required>
+  Unique identifier for this source within the session. Typically the filename or a short descriptive slug, e.g. `"canon-boundary-guard-gpt/SKILL.md"`.
+</ResponseField>
+
+<ResponseField name="source_type" type="string enum" required>
+  Classification of the source. Allowed values:
+
+  | Value | Meaning |
+  |---|---|
+  | `project_file` | A file present in the ChatGPT Project file list |
+  | `project_source` | A Project Source (pinned project knowledge) |
+  | `uploaded_file` | A file uploaded to the current conversation |
+  | `local_file` | A local file on the operator's machine, referenced externally |
+  | `tool_output` | Output produced by a tool call (e.g. code interpreter) |
+  | `command_output` | Output produced by a shell or terminal command |
+  | `verified_external_source` | An external URL or reference the operator has explicitly verified |
+  | `state_file` | A SESSION_STATE or CANON_STATE_DELTA file |
+</ResponseField>
+
+<ResponseField name="status" type="string enum" required>
+  Inspection status of this source. Allowed values:
+
+  | Value | Meaning |
+  |---|---|
+  | `inspected` | Source has been read and registered as L0 |
+  | `unavailable` | Source could not be read (missing, inaccessible) |
+  | `conflicted` | Source content conflicts with another L0 source |
+</ResponseField>
+
+<ResponseField name="notes" type="string">
+  Optional free-text annotation about this source — for example, why it is unavailable or what conflict was detected.
+</ResponseField>
+
+---
+
+### `authorized_deltas` items
+
+<ResponseField name="delta_id" type="string" required>
+  Unique identifier for this authorized delta, e.g. `"delta-001"`. Referenced by `CANON_STATE_DELTA.seq` and by artifact records.
+</ResponseField>
+
+<ResponseField name="authorized_at" type="string" required>
+  ISO-8601 timestamp of when the operator granted authorization.
+</ResponseField>
+
+<ResponseField name="scope" type="string" required>
+  Human-readable description of what was authorized, e.g. `"Add authentication module to project source"`.
+</ResponseField>
+
+<ResponseField name="status" type="string enum" required>
+  Persistence lifecycle status. Allowed values:
+
+  | Value | Meaning |
+  |---|---|
+  | `pending_persistence` | Authorized but not yet written to a durable artifact |
+  | `persisted` | Written through the gate; artifact exists |
+  | `revoked` | Operator revoked the authorization before persistence |
+</ResponseField>
+
+<ResponseField name="target" type="string">
+  Optional. The specific file path, Project Source label, or artifact identifier that this delta targets.
+</ResponseField>
+
+---
+
+### `open_conflicts` items
+
+<ResponseField name="conflict_id" type="string" required>
+  Unique identifier for this conflict, e.g. `"conflict-001"`.
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Human-readable description of the conflict — what sources or decisions are at odds and why.
+</ResponseField>
+
+<ResponseField name="status" type="string enum" required>
+  Resolution status. Allowed values:
+
+  | Value | Meaning |
+  |---|---|
+  | `open` | Conflict has not been addressed |
+  | `resolved` | Operator has resolved the conflict |
+  | `deferred` | Operator has acknowledged and deferred the conflict |
+</ResponseField>
+
+---
+
+### `pending_decisions` items
+
+<ResponseField name="decision_id" type="string" required>
+  Unique identifier for this pending decision, e.g. `"decision-001"`.
+</ResponseField>
+
+<ResponseField name="question" type="string" required>
+  The question the operator must answer, phrased clearly enough to act on.
+</ResponseField>
+
+<ResponseField name="blocking" type="boolean">
+  Optional. When `true`, this decision must be resolved before the session can proceed. When `false` or absent, the decision is queued but does not halt forward progress.
+</ResponseField>
+
+---
+
+### `last_persistent_artifacts` items
+
+<ResponseField name="artifact_id" type="string" required>
+  Unique identifier for this artifact, e.g. `"artifact-001"`. Should correlate with the `delta_id` of the delta that authorized it.
+</ResponseField>
+
+<ResponseField name="artifact_type" type="string enum" required>
+  Classification of the artifact. Allowed values:
+
+  | Value | Meaning |
+  |---|---|
+  | `project_source` | Written as a ChatGPT Project Source |
+  | `downloaded_file` | Offered for download via code interpreter |
+  | `canvas` | Written to a ChatGPT Canvas |
+  | `document` | Written as a ChatGPT document artifact |
+  | `state_file` | A SESSION_STATE or CANON_STATE_DELTA snapshot |
+  | `other` | Any other artifact type |
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO-8601 timestamp of when the artifact was written through the gate.
+</ResponseField>
+
+<ResponseField name="path_or_label" type="string">
+  Optional. The file path, Project Source label, or display name of the artifact.
+</ResponseField>
+
+---
+
+## Complete valid example
+
+```json
+{
+  "protocol": "canon-boundary-guard:gpt-project-adapter",
+  "protocol_version": "1.1",
+  "state_seq": 3,
+  "updated_at": "2025-01-15T14:32:00Z",
+  "active_l0_sources": [
+    {
+      "source_id": "canon-boundary-guard-gpt/SKILL.md",
+      "source_type": "project_source",
+      "status": "inspected"
+    },
+    {
+      "source_id": "canon-boundary-guard-gpt/references/protocol.md",
+      "source_type": "project_source",
+      "status": "inspected"
+    },
+    {
+      "source_id": "canon-boundary-guard-gpt/schemas/SESSION_STATE.schema.json",
+      "source_type": "project_source",
+      "status": "inspected"
+    },
+    {
+      "source_id": "_SESSION_STATE.json",
+      "source_type": "state_file",
+      "status": "inspected",
+      "notes": "Recovered from prior session upload"
+    }
+  ],
+  "authorized_deltas": [
+    {
+      "delta_id": "delta-001",
+      "authorized_at": "2025-01-15T14:10:00Z",
+      "scope": "Add authentication module scaffold to project source",
+      "status": "persisted",
+      "target": "src/auth/index.ts"
+    },
+    {
+      "delta_id": "delta-002",
+      "authorized_at": "2025-01-15T14:28:00Z",
+      "scope": "Update README with setup instructions",
+      "status": "pending_persistence",
+      "target": "README.md"
+    }
+  ],
+  "open_conflicts": [
+    {
+      "conflict_id": "conflict-001",
+      "description": "Two project sources define conflicting API base URLs",
+      "status": "deferred"
+    }
+  ],
+  "pending_decisions": [
+    {
+      "decision_id": "decision-001",
+      "question": "Should the README update overwrite the existing file or append a new section?",
+      "blocking": true
+    }
+  ],
+  "last_persistent_artifacts": [
+    {
+      "artifact_id": "artifact-001",
+      "artifact_type": "project_source",
+      "created_at": "2025-01-15T14:12:00Z",
+      "path_or_label": "src/auth/index.ts"
+    }
+  ],
+  "last_state_hash": "sha256:a3f2e1b4c9d7e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5"
+}
+```
+
+---
+
+## Validation
+
+<Tip>
+  Validate a SESSION_STATE file before treating it as available. An invalid state file must not be used as a recovery source.
+</Tip>
+
+Run `scripts/validate-state` against the state file:
+
+```bash
+python scripts/validate_state.py --state _SESSION_STATE.json
+```
+
+The script validates:
+- All required top-level fields are present
+- `protocol` and `protocol_version` match their constant values
+- `state_seq` is a non-negative integer
+- All array items conform to their nested object schemas
+- When `last_state_hash` is present, it matches the hash of the prior serialized state
+
+---
+
+## Durability
+
+SESSION_STATE at `/mnt/data/_SESSION_STATE.json` is **working state only** — ChatGPT's file storage is not persistent across sessions. To make state durable, use one of the three following methods:
+
+<Note>
+  All three methods produce valid recovery sources. Only methods 1 and 2 survive without any further action from the model; method 3 requires the operator to paste the delta block at session start.
+</Note>
+
+**1. Download and re-upload**
+Download `_SESSION_STATE.json` from code interpreter at the end of a session, then re-upload it at the start of the next session. The model will register it as a `state_file` L0 source.
+
+**2. Save as Project Source**
+Instruct the model to write the current SESSION_STATE as a ChatGPT Project Source (Mode C gate). Project Sources persist across all sessions in the project without any re-upload step.
+
+**3. CANON_STATE_DELTA recovery blocks**
+After every Mode B or Mode C decision the model emits a `CANON_STATE_DELTA` block. Copy that block and paste it at the start of a new session. The model validates the embedded `current_state` and, if valid, restores working state from it. See the [CANON_STATE_DELTA schema reference](/reference/canon-state-delta-schema) for the delta format.

@@ -1,0 +1,124 @@
+---
+title: "Provenance Layers: L0 through L3 Source Classes"
+sidebarTitle: "Source Classes"
+description: "A detailed reference for the five source classes — L0, L1, L1A, L2, and L3 — that Canon Boundary Guard uses to classify every piece of information before it enters persistent project content."
+---
+
+Source classification is the core mechanism that makes Canon Boundary Guard work. Before anything crosses the persistence boundary — before a draft becomes a spec, a chat message becomes a rule, or a model assumption becomes an architectural decision — the frame requires a clear answer to the question: *where did this come from, and how reliably was it inspected?* The answer determines whether the material can be persisted, needs explicit operator authorization, or must be tagged and held back.
+
+## Why Classification Matters
+
+In a long ChatGPT Project session, many things can appear with similar confidence: a file you uploaded, something you mentioned two chats ago, an instruction telling ChatGPT how to behave, and a best practice the model absorbed during training. All of them can end up in the same response. Without provenance labels, it is impossible to know which parts of an output are grounded in inspected evidence and which parts are conversation residue or model assumption.
+
+The source classes give every piece of information a home — and a set of rules about what can be done with it.
+
+---
+
+## L0 — Inspected Evidence
+
+L0 is the only class that may be freely persisted. It covers material that has been explicitly located and inspected in the current task — not merely assumed to exist.
+
+**Sub-types:**
+
+- Project files or sources
+- Local files
+- Git state
+- Tests
+- Schemas
+- Lockfiles
+- Diagnostics
+- Command output
+- Tool output
+- Verified external source
+- Durable state files explicitly exported, re-uploaded, or saved and then inspected
+- Canon artifacts created through the gate and later inspected
+
+<Warning>
+  **A Project Source is L0 only for the relevant surface inspected in the current task. Presence in Project Sources is not evidence by itself.** Uploading a file to a ChatGPT Project does not make its contents L0; the assistant must actively locate and inspect the specific surface in question during the current task before treating it as inspected evidence.
+</Warning>
+
+---
+
+## L1 — Conversation Shaping
+
+L1 covers conversation material that has not been explicitly approved as a durable project decision. It is present in almost every session and it is the primary source of silent promotion risk.
+
+**Sub-types:**
+
+- Current chat
+- Prior project chats
+- Moved chats
+- Brainstorming
+- Preferences not approved as protocol
+- Assistant analysis
+- Project memory
+- Recovery text not yet canonized
+
+L1 material must not be persisted without explicit operator approval. When an output draws on L1 material, it must be tagged `[L1]` inline if the content would change depending on its source — for example, a rule, a name, a version claim, a workflow expectation, or an architecture decision.
+
+---
+
+## L1A — Operator-Approved Delta
+
+L1A is a narrow escape hatch inside L1. It covers conversation material that the operator has **explicitly approved for persistence in the current turn**.
+
+Authorization is scoped: it applies only to what the operator stated. Adjacent claims, related assumptions, and implied extensions are still L1 unless separately approved.
+
+**Important:** L1A becomes evidence only after it has been written to a persistent artifact and later inspected. Until that cycle completes, it remains a pending authorized delta, not inspected evidence.
+
+---
+
+## L2 — Agent-Control Instructions
+
+L2 covers instructions, steering, reminders, or constraints that shape assistant behavior. These are operating instructions directed at the assistant, not project content directed at a human reader or a downstream system.
+
+L2 is not project content. It must not be persisted unless the operator explicitly requests agent-facing operating instructions — for example, when updating Project Instructions or writing a reusable system prompt that is itself the deliverable.
+
+---
+
+## L3 — Unverified Model Prior
+
+L3 covers everything the model brings from training that has not been grounded in inspected evidence for the current task. It is the most invisible of all source classes because the model produces it naturally and with apparent confidence.
+
+**Examples:**
+
+- Model memory about the project not grounded in inspected files
+- Generic best practice ("the standard approach is…")
+- Assumed framework behavior not verified in L0 sources
+- Version claims not present in any inspected file
+- Unstated convention the model treats as obvious
+
+L3 must not be persisted unless verified against L0 or explicitly approved by the operator. Outputs that contain L3 material must be tagged `[L3]` inline and labeled `[DO NOT SAVE - L1/L3 PRESENT]` when a save trigger is present.
+
+---
+
+## Inline Tagging
+
+The protocol uses four inline tags to mark non-L0 material in outputs:
+
+| Tag | Meaning |
+|-----|---------|
+| `[L1]` | From conversation, not approved for persistence |
+| `[L1A]` | Approved this turn, pending persistence |
+| `[L2]` | Agent control — not project content |
+| `[L3]` | Model prior — unverified |
+
+Tags are applied selectively — **only when the content would change if the source were different**. Tag a rule, a name, a version, a claim about behavior, a workflow expectation, or an architecture decision. Do not tag every word.
+
+---
+
+## Summary Table
+
+| Layer | What it is | Can be persisted? |
+|-------|-----------|------------------|
+| **L0** | Inspected evidence from the current task | Yes — freely |
+| **L1** | Conversation material not explicitly approved | No — must not be persisted |
+| **L1A** | Operator-approved delta in the current turn | Yes — within the stated scope only, after written and re-inspected |
+| **L2** | Agent-control instructions shaping assistant behavior | Only when explicitly requested as agent-facing operating instructions |
+| **L3** | Unverified model prior, assumed conventions, version claims | Only when verified against L0 or operator-approved |
+
+---
+
+<Tip>
+  Surface a provenance concern as soon as you notice that a claim, name, version, or rule in the current output cannot be traced to an L0 source. Do not wait until the full response is written. Stopping at the first ungrounded claim is easier to recover from than unwinding a completed draft that mixes L0 and L3 throughout.
+</Tip>

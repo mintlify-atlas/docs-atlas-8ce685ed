@@ -1,0 +1,120 @@
+---
+title: "extract_proof.py: Mechanical Proof-of-Read from Source Files"
+sidebarTitle: "extract_proof.py"
+description: "Generate mechanical proof that a specific file section was actually read: source path, heading, first and last 5 words, line range, and word count."
+---
+
+`extract_proof.py` generates mechanical evidence that a specific section of a
+file was actually read. Given a text or Markdown file — and optionally a heading
+to scope the extraction — it reports the source path, the resolved heading
+label, the line range covered, the first five words, the last five words, and
+the total word count of that section. This information is structurally
+unfakeable from memory alone: a paraphrase cannot produce the exact first and
+last words of an arbitrary section without the file being open. The script
+produces the fields the protocol requires for Mode B and Mode C persistence
+operations.
+
+## Usage
+
+```bash
+# Extract proof from the full file
+python scripts/extract_proof.py references/protocol.md
+
+# Extract proof from a specific heading
+python scripts/extract_proof.py references/protocol.md --heading "## L0 Evidence"
+
+# Extract proof from a heading and emit a JSON report
+python scripts/extract_proof.py references/protocol.md --heading "L0 Evidence" --json
+```
+
+## Arguments
+
+<ParamField path="path" type="Path (positional)">
+  Path to the text or Markdown file to extract proof from. The file must exist;
+  the script exits with an error message if the path is missing.
+</ParamField>
+
+<ParamField path="--heading" type="string">
+  Markdown heading to scope the extraction. The script first tries an **exact
+  line match** (including `#` marks), then falls back to a **heading-text
+  match** (strips the `#` prefix and surrounding whitespace). If omitted, the
+  full file content is used and the heading label is reported as `FULL_FILE`.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Emit a JSON report instead of plain-text output. Useful for storing the proof
+  record in `SESSION_STATE` or passing it to other tools.
+</ParamField>
+
+## Output
+
+### Plain text (default)
+
+```
+source: references/protocol.md
+heading: ## L0 Evidence
+line_range: 10-25
+first_5_words: Persistent or verified evidence inspected
+last_5_words: inspected in the current task.
+word_count: 87
+```
+
+### JSON (`--json`)
+
+```json
+{
+  "source": "references/protocol.md",
+  "heading": "## L0 Evidence",
+  "line_range": [10, 25],
+  "first_5_words": ["Persistent", "or", "verified", "evidence", "inspected"],
+  "last_5_words": ["inspected", "in", "the", "current", "task."],
+  "word_count": 87
+}
+```
+
+`line_range` is a two-element array `[start, end]` using 1-based line numbers,
+where `start` is the line of the heading and `end` is the line immediately
+before the next heading at the same or higher level (or the last line of the
+file if no such heading follows).
+
+## Heading matching logic
+
+When `--heading` is provided, the script searches the file in two passes:
+
+1. **Exact line match** — the full heading string (e.g. `## L0 Evidence`)
+   must match a line exactly after stripping the trailing newline.
+2. **Heading-text match** — if no exact match is found, the script strips the
+   `#` prefix and surrounding whitespace from the search term and compares it to
+   the text portion of each Markdown heading line (any level).
+
+The first match found in either pass is used. If no match is found in either
+pass, the script raises a `ValueError` and exits with an error.
+
+Section boundaries are determined by heading level: the section ends at the
+next heading with a level equal to or higher than the matched heading (i.e. the
+same or fewer `#` characters).
+
+## Short sections
+
+If the selected section contains fewer than ten words, `first_5_words` and
+`last_5_words` both contain the **full word list** of the section rather than
+two separate five-word windows.
+
+## Encoding
+
+Files are read with `utf-8-sig` encoding, which transparently strips a UTF-8
+BOM if present. This matches the encoding used by `validate_state.py` and
+`artifact_fingerprint.py` throughout the toolchain.
+
+## How it fits the protocol
+
+This script produces the mechanical proof required for **Mode B** (semantic
+reorganisation of L0) and **Mode C** (promotion of L1/L1A/L2/L3) persistence
+operations. See [/reference/proof-of-read](/reference/proof-of-read) for the
+full proof-of-read requirements and how the `first_5_words` / `last_5_words`
+fields map to the protocol's evidence format.
+
+<Note>
+  A paraphrase is never valid proof-of-read. Use this script to generate the
+  exact first and last words that the protocol requires.
+</Note>

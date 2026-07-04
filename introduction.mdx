@@ -1,0 +1,52 @@
+---
+title: "Canon Boundary Guard: Provenance Control for ChatGPT Projects"
+sidebarTitle: "Introduction"
+description: "A source-bundle protocol and prompt-engineering frame that stops ChatGPT Projects from silently promoting chat messages, drafts, and model assumptions into canon."
+---
+
+Canon Boundary Guard for GPT Projects is a source-bundle frame that helps ChatGPT keep project files, chat context, project instructions, working assumptions, and generated drafts separated during long or complex sessions. It is not a native ChatGPT skill — it works by combining a zipped source bundle added to Project Sources with a set of Project Instructions that tell ChatGPT how to classify, inspect, and gate material before anything becomes reusable project content.
+
+## The Problem It Solves
+
+In a long ChatGPT Project session, many things can start looking equally authoritative: files already attached to the Project, things said in the current chat, older project memory or moved chats, instructions that tell ChatGPT how to behave, assumptions made by the model, and drafts generated during the session. Without a clear frame, any of these can silently drift into canon.
+
+Canon Boundary Guard prevents that by assigning every piece of information to a **source class** — L0 through L3 — and requiring a classification step before anything crosses the persistence boundary. A chat message, draft, assumption, or generated file should not silently become canon.
+
+## High-Level Architecture
+
+The frame has three interlocking parts:
+
+1. **Source bundle** — the folder `canon-boundary-guard-gpt/` is distributed as a zip and uploaded to Project Sources. It contains the skill definition (`SKILL.md`), reference documents, JSON schemas, and optional Python validators. At runtime, ChatGPT must locate and inspect the bundle before substantive work begins.
+
+2. **Project Instructions anchor** — the contents of `PROJECT_CUSTOM_INSTRUCTIONS.txt` are pasted into the Project's instructions field. This tells ChatGPT to run a Status Check bootstrap at the start of every new session, inspecting the bundle before producing any persistent output.
+
+3. **Simulated persistence gate** — because GPT Projects do not expose a user-defined pre-write hook, the adapter defines a simulated gate at the semantic persistence boundary. Before any durable output is written, ChatGPT must classify provenance, determine the operating mode (A, B, or C), and — for Mode C operations — produce a full dossier and stop unless the operator explicitly authorizes the promotion.
+
+## Key Concepts
+
+<CardGroup cols={2}>
+  <Card title="Source Classes" icon="layer-group" href="/concepts/source-classes">
+    Understand the L0–L3 provenance layers that drive every classification decision, from inspected project files down to unverified model assumptions.
+  </Card>
+  <Card title="Operating Modes" icon="sliders" href="/concepts/operating-modes">
+    Learn when ChatGPT should proceed silently (Mode A), require a compact dossier (Mode B), or stop and request explicit authorization (Mode C).
+  </Card>
+  <Card title="Simulated Gate" icon="shield-check" href="/usage/simulated-gate">
+    See how the persistence boundary works in GPT Projects, what triggers the gate, and how save labels are applied deterministically.
+  </Card>
+  <Card title="Installation" icon="wrench" href="/setup/installation">
+    Step-by-step instructions for building the zip bundle, uploading it to Project Sources, and pasting the Project Instructions anchor.
+  </Card>
+</CardGroup>
+
+## Limits
+
+<Warning>
+  Canon Boundary Guard reduces silent promotion — it is **not a hard guarantee**. ChatGPT can still answer incorrectly, skip instructions, lose context, or fail to inspect available files. The frame is a working discipline for GPT Projects. It cannot block every answer, save, file action, or UI action; it only defines what should be recognized as canon. Material saved through the ChatGPT UI without passing the gate may be inspected as evidence of its own contents, but remains L1 or recovery material unless later admitted through the gate.
+</Warning>
+
+## The Source Bundle Model
+
+<Note>
+  The entire frame travels as a single zip — the folder `canon-boundary-guard-gpt/` compressed and uploaded to Project Sources. At runtime ChatGPT locates the bundle, extracts it if necessary as a source-staged extraction, and inspects the entrypoint `canon-boundary-guard-gpt/SKILL.md` before any substantive work. The zip, Project Source record, and any `/mnt/data` file are **not** canon by default; they become L0 only for the specific surface actively inspected in the current task. A Project can also be used without the bundle by uploading it manually to an ordinary chat, but continuity is weaker because the instruction anchor lives only inside the conversation.
+</Note>

@@ -1,0 +1,64 @@
+---
+title: "The Simulated PreToolUse Gate: Controlling Canon Promotion"
+sidebarTitle: "Simulated Gate"
+description: "How Canon Boundary Guard simulates a pre-write hook in ChatGPT Projects to prevent unguarded promotion of drafts and model assumptions into canon."
+---
+
+ChatGPT Projects do not expose a user-defined pre-write hook equivalent to the `PreToolUse` event available in tools like Codex. Without such a hook, nothing natively stops a chat exchange, a model assumption, or an in-progress draft from silently becoming a Project Source, a reusable spec, or a downloadable artifact. Canon Boundary Guard addresses this gap by defining a **simulated PreToolUse gate** at the semantic persistence boundary — a mandatory classification and authorization step that ChatGPT must perform before any output crosses into durable or canon territory.
+
+## When to Run the Gate
+
+The gate must be run before any of the following operations:
+
+- **File writes intended as durable output** — any write that is meant to persist beyond the current scratch session
+- **Downloadable final artifacts** — files produced as ready-to-export deliverables
+- **Canvas updates intended for reuse** — Canvas or document output that will be referenced, shared, or built upon
+- **Project Source candidates** — content proposed for upload or registration as a Project Source
+- **Reusable docs, specs, or prompts** — documentation, specifications, protocols, or prompt templates intended for ongoing use
+- **Protocol, naming, architecture, workflow, or invariant changes** — any output that defines or modifies operating rules, structural decisions, or behavioral expectations
+- **State or recovery operations** — writes to `_SESSION_STATE.json`, emission of `CANON_STATE_DELTA` blocks, or any output used to recover session state
+- **Promotion from `/mnt/data/scratch/**` to any canon or final destination** — any movement of content out of the disposable scratch zone (see [Scratch & Canon](/usage/scratch-and-canon) for full promotion rules)
+- **`[SAFE TO SAVE]` output** — any response that will carry this label must pass the gate before the label is applied
+
+## When NOT to Run the Gate
+
+The gate is not required for operations that produce no durable output and carry no canon risk:
+
+- **Temporary scratch operations** — working files written to `/mnt/data/scratch/**` with no promotion intent
+- **Private calculations** — intermediate numerical, logical, or structural computations used only within the current step
+- **Intermediate parsing** — extraction or transformation of content that will be discarded or inspected before any further use
+- **Disposable tests** — one-off checks, dry runs, or exploratory outputs that are not surfaced as decisions or results
+
+<Note>
+Disposable scratch work inside `/mnt/data/scratch/**` is **Mode A by default** and does not require a dossier. The gate only activates when content leaves scratch or is presented as persistent, final, or reusable.
+</Note>
+
+## Mode Classification at the Gate
+
+Before the gate can complete, the proposed output must be classified into one of three operating modes. The mode determines what authorization and documentation the gate requires:
+
+- **Mode A — Mechanical L0 operation.** The output is a straightforward mechanical edit with clear L0 provenance (inspected project files, verified sources, direct tool output). The gate passes silently with no dossier required.
+- **Mode B — Semantic reorganization of L0.** The output reorganizes, restructures, or summarizes existing L0 evidence. A compact dossier is required if the output is persistent. Mechanical proof-of-read is required before writing.
+- **Mode C — Promotion of L1, L1A, L2, or L3.** The output introduces conversation material, agent-control instructions, or unverified model priors into persistent content. A full dossier is required and ChatGPT must stop before writing unless the operator has explicitly authorized the delta.
+
+For the full definition of each mode and the dossier formats they require, see [Operating Modes](/concepts/operating-modes).
+
+## Proof-of-Read Requirement for Mode B and C
+
+For Mode B and Mode C operations, the gate requires **mechanical proof-of-read** before any persistent write is allowed. This is not a summary or a paraphrase — it is a verifiable demonstration that the relevant source surfaces were actively inspected in the current task, not assumed from memory or inferred from prior sessions.
+
+Proof-of-read records the inspected file paths, source identifiers or hashes where available, and the specific surfaces consulted. If proof-of-read cannot be provided, the gate must not pass. For the full requirements, see [Proof of Read](/reference/proof-of-read).
+
+<Warning>
+The simulated gate is **semantic, not a hard block**. ChatGPT has no native enforcement mechanism that physically prevents a write. The gate is effective only when ChatGPT is directed — through Project Instructions, the skill bundle, and operator oversight — to follow the protocol. An operator who does not load the bundle, does not run the bootstrap Status Check, or does not maintain the gate in Project Instructions will receive no gate behavior at all.
+</Warning>
+
+## Real-World Example: When a Draft Starts Acting Like a Decision
+
+Consider a project where the operator asks ChatGPT to "think through some naming options for the API endpoints." ChatGPT produces a structured list with rationale in the chat. The conversation continues; the operator says "I like option 2" and asks for help writing the spec.
+
+Without the simulated gate, the next step — writing the spec — might simply embed the "agreed" naming from the chat as settled fact, producing a Project Source or downloadable spec that treats an in-conversation preference as an authorized architectural decision.
+
+With the gate active, the spec write triggers classification. The naming from the chat is L1 (conversation material not explicitly approved as a durable project decision). The gate recognizes a **Mode C** promotion: L1 material is being written into a persistent artifact. ChatGPT stops, emits a dossier identifying the L1 naming as the delta, and requests explicit operator authorization before writing. The operator can then either confirm the naming as an authorized L1A delta — scoped to the stated decision — or revise it before the spec is produced.
+
+The gate does not prevent the work. It makes the boundary between "we discussed it" and "it is now project canon" explicit and intentional.

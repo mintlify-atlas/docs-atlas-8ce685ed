@@ -1,0 +1,89 @@
+---
+title: "Save Labels: Deterministic Output Classification"
+sidebarTitle: "Save Labels"
+description: "The four Canon Boundary Guard save labels, their deterministic triggers, and how they block unreviewed conversation residue from entering project canon."
+---
+
+Save labels are the visible surface of Canon Boundary Guard's output classification system. Every response that crosses into durable, structured, or canon-candidate territory must carry exactly one label — and that label is determined by a fixed set of **deterministic triggers**, not by judgment, tone, or context. Labels are not optional annotations or style conventions. They are the protocol's primary signal that the simulated gate has run, what it found, and whether the output is safe to save, blocked from saving, or requires explicit operator authorization before it becomes part of the project record.
+
+## The Four Labels
+
+Each label corresponds to a distinct gate outcome.
+
+### `[SAFE TO SAVE]`
+
+```
+[SAFE TO SAVE]
+```
+
+The simulated gate passed. The output contains only L0 material (inspected, verified evidence) or material explicitly authorized by the operator as an L1A delta in the current turn. This label may never be applied unless the gate actually ran and passed — it is not a default, a shorthand for "looks fine," or a label that can be applied from memory.
+
+---
+
+### `[DO NOT SAVE - L1/L3 PRESENT]`
+
+```
+[DO NOT SAVE - L1/L3 PRESENT]
+```
+
+The output contains conversation residue (L1) or unverified model prior (L3) that has not been authorized for persistence. Saving this output would introduce unreviewed shaping — chat preferences, prior discussion conclusions, assumed framework behavior, or unstated conventions — into project canon. The output should be treated as a working draft only.
+
+---
+
+### `[STATE DELTA - SAVE/PASTE ONLY AS RECOVERY MATERIAL]`
+
+```
+[STATE DELTA - SAVE/PASTE ONLY AS RECOVERY MATERIAL]
+```
+
+The response contains a `CANON_STATE_DELTA` block produced after a Mode B or Mode C state-changing decision. This block is valid recovery material but is not general-purpose project content. It must be saved or pasted only in the context of session state recovery, not embedded in project documentation, specs, or source files as substantive content.
+
+---
+
+### `[DRAFT - REQUIRES OPERATOR APPROVAL]`
+
+```
+[DRAFT - REQUIRES OPERATOR APPROVAL]
+```
+
+The output represents a promotion candidate — content that could become canon but has not yet received explicit operator authorization. This label appears when L1A authorization is pending, when the operator has not explicitly confirmed the delta, or when the output is structurally ready for canon but the gate stopped short of final approval.
+
+---
+
+## Deterministic Triggers
+
+Labels are applied only when at least one of the following triggers is present in the response. These triggers are not discretionary — if a trigger fires, a label is required:
+
+- The response contains a **markdown code block**
+- The response contains **JSON, YAML, TOML, XML, SQL, Python, shell, or schema-like content**
+- The response **defines protocol, policy, architecture, naming, workflow, state, invariants, or operating rules**
+- The response contains **file contents intended for copy or save**
+- The response contains **Project Instructions text**
+- The response contains **GPT Project adapter text**
+- The response contains a **`SESSION_STATE` or `CANON_STATE_DELTA`** block
+- The response is produced after the operator says **"Promote this draft to canon"** or equivalent
+- The operator explicitly requests **final, spec, saveable, or canon output**
+- The response **creates or modifies a reusable artifact specification**
+
+## No-Label Cases
+
+The following response types do not require a save label, provided no deterministic trigger is also present:
+
+- Ordinary conversational replies
+- Critique or review comments
+- Planning discussions
+- Clarification questions or answers
+
+If a deterministic trigger fires within any of these response types — for example, a planning discussion that produces a structured YAML block — the trigger takes precedence and a label is required.
+
+## The Stop-Before-Final-Form Rule
+
+When a deterministic trigger is present **and** the response contains non-L0 material (L1, L2, or L3), ChatGPT must **stop before producing the final form** of the output. It must surface the non-L0 content, classify it, and request explicit operator authorization before rendering the complete artifact.
+
+This rule prevents the common failure mode where a response flows through planning → draft → structured output in a single turn, and the final structured output — now carrying the full weight of a spec or source file — silently embeds conversation preferences, model assumptions, or prior-session conclusions that were never approved as project decisions.
+
+The stop does not apply when the operator has explicitly authorized the delta in the current turn (L1A authorization scoped to the stated change).
+
+<Tip>
+If you see `[DO NOT SAVE - L1/L3 PRESENT]` on a response you expected to save, ask ChatGPT directly: **"Which specific parts of this output are L1 or L3, and what would need to change for this to pass the gate?"** This surfaces exactly which material is conversation residue or unverified model prior, so you can decide whether to authorize it as an L1A delta, revise it, or discard it.
+</Tip>

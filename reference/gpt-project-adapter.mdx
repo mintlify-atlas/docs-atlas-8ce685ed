@@ -1,0 +1,144 @@
+---
+title: "GPT Project Adapter: Simulated Gate Architecture"
+sidebarTitle: "GPT Project Adapter"
+description: "How Canon Boundary Guard simulates a semantic persistence gate in GPT Projects, including bootstrap, runtime zones, persistence boundaries, and save labels."
+---
+
+Codex can inject context before write operations through PreToolUse hooks — a native mechanism that intercepts writes at the tooling level. GPT Projects do not expose an equivalent user-defined pre-write hook. The GPT Project Adapter addresses this gap by defining a simulated semantic persistence boundary: a set of protocol rules, runtime zones, and deterministic labels that the assistant applies before producing any output intended for persistence. The gate is not enforced by the platform; it is enforced by strict adherence to the protocol at the moment content would otherwise be written.
+
+---
+
+## Source-Bundle Model
+
+The Canon Boundary Guard package for GPT Projects is distributed as a zip containing the `canon-boundary-guard-gpt/` folder and uploaded to Project Sources.
+
+At runtime, the assistant must locate the bundle through available Project Source retrieval and/or `/mnt/data`. The expected inspected entrypoint is:
+
+```
+canon-boundary-guard-gpt/SKILL.md
+```
+
+**Source-staged extraction rules:**
+
+- If the bundle is present as a zip in `/mnt/data`, extract it before bootstrap as a source-staged extraction.
+- Before treating any extracted surface as L0, record the source zip path or source ID, and hash if available.
+- A source-staged extraction supports L0 inspection only as a mechanical view of the uploaded or Project Source zip it came from, anchored to source identity or hash.
+- Assistant-generated scratch artifacts are not evidence — they remain non-canon regardless of where they are written.
+- If source identity or hash is unavailable, declare the missing anchor and limit L0 to the inspected extracted path with a risk note.
+
+<Note>
+The zip, the Project Source record, and the `/mnt/data` file are not canon by default. They become L0 only for the relevant surface actively inspected in the current task.
+</Note>
+
+---
+
+## Mandatory Re-Entry Bootstrap
+
+Before the first substantive output in any new Project session, run a **Status Check**. Do not assume gate mechanics from memory — gate behavior is read from source on every session entry.
+
+Status Check requires active inspection of:
+
+1. `canon-boundary-guard-gpt/SKILL.md`
+2. `canon-boundary-guard-gpt/references/protocol.md`
+3. `canon-boundary-guard-gpt/references/gpt-project-adapter.md`
+4. Source zip path or source ID, and hash if source-staged extraction is used and the anchor is available
+5. Latest `SESSION_STATE` if available
+6. `canon-boundary-guard-gpt/references/state-and-recovery.md` — required if first-install state creation is needed
+7. `canon-boundary-guard-gpt/schemas/SESSION_STATE.schema.json` — required if first-install state creation is needed
+
+If inspection of any required source fails, enter read-only mode. Do not produce persistent output until the required sources can be inspected.
+
+**Session state initialization:** If no `SESSION_STATE` exists, initialize a new working state at `/mnt/data/_SESSION_STATE.json` only when the operator declares a fresh install, or when the current task is initial bundle installation and there is no prior-state claim. Create it only after Status Check succeeds, `state-and-recovery.md` and `SESSION_STATE.schema.json` have been inspected, and the created state validates if `scripts/validate_state.py` is available. Fresh-install initialization is not durable canon by itself.
+
+If this is not a fresh install and no valid `SESSION_STATE` is available, enter read-only recovery mode.
+
+---
+
+## Persistence Boundary
+
+The table below defines when the gate must run and when it must not.
+
+| Situation | Gate required? |
+|-----------|---------------|
+| File writes intended as durable output | ✅ Yes |
+| Downloadable final artifacts | ✅ Yes |
+| Canvas updates intended for reuse | ✅ Yes |
+| Project Source candidates | ✅ Yes |
+| Reusable docs, specs, or prompts | ✅ Yes |
+| Protocol, naming, architecture, workflow, or invariant changes | ✅ Yes |
+| State or recovery operations | ✅ Yes |
+| Promotion from `/mnt/data/scratch/**` to any canon or final destination | ✅ Yes |
+| `[SAFE TO SAVE]` output | ✅ Yes |
+| Temporary scratch operations | ❌ No |
+| Private calculations | ❌ No |
+| Intermediate parsing | ❌ No |
+| Disposable tests | ❌ No |
+
+<Note>
+CBG does not prevent UI saves — it controls canon recognition. Material saved without gate may be inspected as evidence of its own contents, but remains L1/recovery material unless later admitted through the gate.
+</Note>
+
+---
+
+## Runtime Zones
+
+The adapter defines three runtime zones in `/mnt/data`. For full treatment of scratch-to-canon promotion rules, see [Scratch and Canon](/usage/scratch-and-canon).
+
+<Accordion title="/mnt/data/scratch/**">
+**Disposable, non-canon scratch space.** Operations in this zone are Mode A by default and do not require a dossier. Content here is never treated as L0 until it has been inspected as part of an active task. Nothing in this zone is a candidate for persistence until it passes through the gate.
+</Accordion>
+
+<Accordion title="/mnt/data/canon/**">
+**Guarded candidate output.** Content written here is treated as a canon candidate. The gate must run before creation or update of any file in this zone. Writes to this zone without a passed gate are protocol violations.
+</Accordion>
+
+<Accordion title="/mnt/data/_SESSION_STATE.json">
+**Working state only — not durable canon.** This file holds the current session's working state. It is not a canon artifact. It may be used for recovery material but is not itself admitted to canon without going through the gate.
+</Accordion>
+
+---
+
+## Save Labels
+
+Save labels are applied to responses when deterministic triggers are present. Labels are never applied speculatively or as a courtesy — they fire on specific conditions.
+
+**Deterministic triggers:**
+
+- Response contains a markdown code block
+- Response contains JSON, YAML, TOML, XML, SQL, Python, shell, or schema-like content
+- Response defines protocol, policy, architecture, naming, workflow, state, invariants, or operating rules
+- Response contains file contents intended for copy or save
+- Response contains Project Instructions text
+- Response contains GPT Project adapter text
+- Response contains SESSION_STATE or CANON_STATE_DELTA
+- Response is produced after "Promote this draft to canon"
+- Operator explicitly asks for final, spec, saveable, or canon output
+- Response creates or modifies a reusable artifact specification
+
+**No-label cases** (unless a deterministic trigger is also present):
+
+- Ordinary conversational replies
+- Critique
+- Planning
+- Clarification
+
+**The four labels:**
+
+| Label | When applied |
+|-------|-------------|
+| `[SAFE TO SAVE]` | The simulated gate passed — all material is L0 or authorized L1A, no unresolved conflicts |
+| `[DO NOT SAVE - L1/L3 PRESENT]` | Non-L0, non-authorized material is present in the output |
+| `[STATE DELTA - SAVE/PASTE ONLY AS RECOVERY MATERIAL]` | Output contains state delta that is not yet canon |
+| `[DRAFT - REQUIRES OPERATOR APPROVAL]` | Output requires an explicit operator decision before it can be saved |
+
+<Warning>
+Never mark `[SAFE TO SAVE]` unless the simulated gate passed. A response that contains L1, L2, or L3 material without explicit operator authorization must not receive this label regardless of how complete or well-formed the content appears.
+</Warning>
+
+---
+
+## Stop-Before-Final-Form Rule
+
+When a deterministic trigger is present **and** the output contains non-L0 material, the assistant must stop before producing final-form output — unless the operator explicitly authorized the delta.
+
+This means: if a response would trigger a save label and the content has not been fully cleared through the gate, the assistant declares the pending items (unresolved L1, L3, or conflicts) and requests operator authorization before proceeding to the final artifact. Producing the artifact first and labeling it `[DO NOT SAVE]` afterward does not satisfy this rule — the stop must occur before final form is written.

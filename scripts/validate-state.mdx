@@ -1,0 +1,147 @@
+---
+title: "validate_state.py: Validate SESSION_STATE and State Deltas"
+sidebarTitle: "validate_state.py"
+description: "Mechanically validate SESSION_STATE.json and CANON_STATE_DELTA.json files against their schemas. Supports plain-text and JSON report output."
+---
+
+`validate_state.py` performs mechanical schema checks on `SESSION_STATE.json` and `CANON_STATE_DELTA.json` files. It verifies structure, types, required keys, and cross-file constraints — but it does **not** decide provenance. Determining whether a piece of content is L0, L1, or L1A remains the operator's responsibility. The script is an optional helper; the protocol does not depend on it being present.
+
+## Prerequisites
+
+- **Python 3** (no third-party packages required for basic use)
+- **`jsonschema`** (optional) — when installed, the script uses `Draft202012Validator` for full schema validation. When not available, it automatically falls back to a strict manual validator that covers the same schema keywords used in the Canon Boundary Guard schemas.
+
+Install the optional dependency with:
+
+```bash
+pip install jsonschema
+```
+
+## Usage
+
+```bash
+# Validate a SESSION_STATE file only
+python scripts/validate_state.py --state /path/to/SESSION_STATE.json
+
+# Validate a CANON_STATE_DELTA file only
+python scripts/validate_state.py --delta /path/to/CANON_STATE_DELTA.json
+
+# Validate both files together
+python scripts/validate_state.py --state /path/to/SESSION_STATE.json --delta /path/to/CANON_STATE_DELTA.json
+
+# Emit a machine-readable JSON report
+python scripts/validate_state.py --state /path/to/SESSION_STATE.json --json
+```
+
+## Arguments
+
+<ParamField path="--state" type="Path">
+  Path to the `SESSION_STATE.json` file to validate. At least one of `--state`
+  or `--delta` must be provided.
+</ParamField>
+
+<ParamField path="--delta" type="Path">
+  Path to the `CANON_STATE_DELTA.json` file to validate. Can be combined with
+  `--state` to validate both files in a single run.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Emit a JSON validation report to stdout instead of the default plain-text
+  output. Useful for piping results into other tools or storing the report as an
+  artifact.
+</ParamField>
+
+## Output
+
+### Plain text (default)
+
+When validation passes, the script prints `valid` and exits with code `0`. When
+validation fails, it prints `invalid` followed by a bullet list of error
+messages, and exits with code `1`.
+
+```
+valid
+```
+
+```
+invalid
+- SESSION_STATE: missing required key: state_seq
+- SESSION_STATE: unexpected key: legacy_field
+```
+
+### JSON report (`--json`)
+
+The JSON report always contains `valid` (boolean) and `errors` (array of
+strings). When there are no errors, `errors` is an empty array.
+
+```json
+{
+  "valid": true,
+  "errors": []
+}
+```
+
+```json
+{
+  "valid": false,
+  "errors": [
+    "SESSION_STATE: missing required key: state_seq",
+    "CANON_STATE_DELTA: current_state.state_seq should equal delta.seq (4 != 5)"
+  ]
+}
+```
+
+## Validation logic
+
+### Schema resolver
+
+`validate_state.py` resolves schemas automatically relative to its own file
+location. It looks for:
+
+- `../schemas/SESSION_STATE.schema.json` — used when `--state` is provided
+- `../schemas/CANON_STATE_DELTA.schema.json` — used when `--delta` is provided
+
+No environment variables or configuration files are required.
+
+### jsonschema (preferred)
+
+When `jsonschema` is importable, the script constructs a
+`Draft202012Validator` and iterates all validation errors, reporting each with
+its dot-notation path and message.
+
+### Strict manual fallback
+
+When `jsonschema` is not available, the script runs its own recursive validator.
+It supports exactly the schema keywords used by the Canon Boundary Guard schemas:
+
+| Keyword | What is checked |
+|---|---|
+| `type` | Python-level type check; `boolean` is kept separate from `integer` |
+| `const` | Exact value equality |
+| `enum` | Value membership in the allowed list |
+| `minimum` | Numeric lower bound |
+| `required` | All listed keys are present in the object |
+| `additionalProperties: false` | No keys outside `properties` are allowed |
+| `properties` | Recursively validates each present property |
+| `items` | Recursively validates each element in an array |
+
+If the schema contains a keyword outside this set, the validator returns an
+`unsupported schema keyword` error and **fails closed** — it does not silently
+skip unknown constraints.
+
+### Delta cross-file check
+
+When `--delta` is provided, the script applies one additional constraint beyond
+the schema: it checks that `current_state.state_seq` equals `delta.seq`. A
+mismatch indicates the embedded snapshot does not match the delta's own sequence
+number, which would be an inconsistent delta file.
+
+### Encoding
+
+All JSON files are read with `utf-8-sig` encoding, which transparently strips a
+UTF-8 BOM if present.
+
+<Note>
+  These scripts are optional mechanical helpers. They do not make provenance
+  decisions — that remains the operator's responsibility.
+</Note>

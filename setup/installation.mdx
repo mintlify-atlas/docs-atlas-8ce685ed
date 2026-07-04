@@ -1,0 +1,120 @@
+---
+title: "Install Canon Boundary Guard in a ChatGPT Project"
+sidebarTitle: "Installation"
+description: "Add the Canon Boundary Guard source bundle to a ChatGPT Project and paste the Project Instructions anchor to activate the frame."
+---
+
+Installing Canon Boundary Guard means two things: uploading the zipped `canon-boundary-guard-gpt/` bundle to your ChatGPT Project's files or sources, and pasting the contents of `PROJECT_CUSTOM_INSTRUCTIONS.txt` into the Project Instructions field. The zip provides the frame — the skill definition, reference files, schemas, and optional scripts. The Project Instructions tell ChatGPT to locate the bundle at session start, inspect it, and use it as the operating frame before producing any substantive output. Together, the two pieces form the stable anchor that prevents chat messages, drafts, and model assumptions from being silently promoted into accepted project truth.
+
+<Tabs>
+  <Tab title="Project Setup (Recommended)">
+    <Steps>
+      <Step title="Clone or download the repository">
+        Clone the repository or download it as a zip from GitHub:
+
+        ```bash
+        git clone https://github.com/XxYouDeaDPunKxX/canon-boundary-guard-for-gpt-project.git
+        ```
+
+        If you downloaded the full repository zip, extract it locally before continuing.
+      </Step>
+
+      <Step title="Create a zip from the bundle folder">
+        Zip the `canon-boundary-guard-gpt/` folder. This folder is the published unit — zip it as-is, preserving the internal directory structure:
+
+        ```text
+        canon-boundary-guard-gpt/
+        |-- SKILL.md
+        |-- references/
+        |   |-- gpt-project-adapter.md
+        |   |-- proof-of-read.md
+        |   |-- protocol.md
+        |   |-- scratch-canon.md
+        |   `-- state-and-recovery.md
+        |-- schemas/
+        |   |-- CANON_STATE_DELTA.schema.json
+        |   `-- SESSION_STATE.schema.json
+        `-- scripts/
+            |-- artifact_fingerprint.py
+            |-- extract_proof.py
+            `-- validate_state.py
+        ```
+
+        On macOS or Linux:
+
+        ```bash
+        zip -r canon-boundary-guard-gpt.zip canon-boundary-guard-gpt/
+        ```
+
+        On Windows, right-click the folder and choose **Compress to ZIP file**.
+      </Step>
+
+      <Step title="Create a ChatGPT Project">
+        In ChatGPT, open the sidebar and create a new **Project**. Give it a name relevant to your work. Projects provide the stable container that gives the frame persistent continuity across sessions.
+      </Step>
+
+      <Step title="Add the zip to Project Sources or files">
+        Inside the Project, open **Project Settings** (or the files/sources panel) and upload `canon-boundary-guard-gpt.zip`. ChatGPT will store this as a Project Source that persists across all chats in the Project.
+      </Step>
+
+      <Step title="Paste the Project Instructions">
+        Still in Project Settings, open the **Project Instructions** field. Copy the full, unmodified contents of `PROJECT_CUSTOM_INSTRUCTIONS.txt` from the repository root and paste them verbatim. Do not paraphrase or shorten the text — the exact wording is the instruction anchor.
+      </Step>
+
+      <Step title="Start a new chat inside the Project">
+        Open a new chat within the Project. ChatGPT should immediately run Status Check: locate the bundle, extract if needed, inspect the bootstrap sources, and confirm the frame is active before producing any substantive output.
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Manual Chat Setup">
+    <Steps>
+      <Step title="Upload the zip in a normal ChatGPT conversation">
+        In any standard ChatGPT chat (outside a Project), use the file attachment button to upload the `canon-boundary-guard-gpt.zip` bundle directly into the conversation.
+      </Step>
+
+      <Step title="Ask ChatGPT to inspect the bundle and activate the frame">
+        Send a message instructing ChatGPT to treat the uploaded bundle as the active provenance-control frame for the session. For example:
+
+        ```text
+        Please inspect the uploaded canon-boundary-guard-gpt bundle and use it
+        as the active Canon Boundary Guard frame for this session.
+        ```
+
+        ChatGPT should locate the zip in `/mnt/data`, perform source-staged extraction, inspect `SKILL.md` and the reference files, and confirm the frame is active.
+      </Step>
+    </Steps>
+
+    <Warning>
+      Manual chat setup is less stable than a Project. When the frame is anchored only inside a conversation, it does not persist across new chats. Every new conversation requires re-uploading the bundle and re-activating the frame. For sessions where continuity and reliable bootstrap matter, use the Project setup instead.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Bundle structure
+
+The `canon-boundary-guard-gpt/` folder is the complete published unit. The tree below shows every file included when you zip it for upload:
+
+```text
+canon-boundary-guard-gpt/
+|-- SKILL.md
+|-- references/
+|   |-- gpt-project-adapter.md
+|   |-- proof-of-read.md
+|   |-- protocol.md
+|   |-- scratch-canon.md
+|   `-- state-and-recovery.md
+|-- schemas/
+|   |-- CANON_STATE_DELTA.schema.json
+|   `-- SESSION_STATE.schema.json
+`-- scripts/
+    |-- artifact_fingerprint.py
+    |-- extract_proof.py
+    `-- validate_state.py
+```
+
+`SKILL.md` is the primary skill definition and the first file ChatGPT inspects during bootstrap. The `references/` files define provenance layers, the GPT Project persistence boundary, state and recovery rules, scratch-to-canon promotion rules, and proof-of-read requirements. The `schemas/` files are used to validate session state and snapshot deltas. The `scripts/` files are optional Python helpers for mechanical validation — they are not hooks and do not make provenance decisions.
+
+<Note>
+  A ChatGPT **Project** is the recommended container for running Canon Boundary Guard. Uploading the bundle as a Project Source means it is available at the start of every chat inside the Project, giving the frame a stable and persistent home. Manual chat use is possible but provides weaker continuity.
+</Note>

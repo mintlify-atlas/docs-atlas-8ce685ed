@@ -1,0 +1,92 @@
+---
+title: "Proof-of-Read: Mechanical Evidence Requirements"
+sidebarTitle: "Proof of Read"
+description: "Requirements for mechanical proof-of-read in Mode B and Mode C persistence operations, including field specifications, failure behavior, and valid examples."
+---
+
+Proof-of-read is the mechanical evidence that a source was actively inspected — not recalled, paraphrased, or assumed. It is required for any Mode B or Mode C persistence operation: before promoting content to canon, updating a persistent artifact, or marking output `[SAFE TO SAVE]`, the assistant must demonstrate that the relevant source sections were read through an available retrieval or file mechanism. Proof-of-read is not a summary or a restatement. It is a record of what was mechanically observed, anchored to exact text boundaries.
+
+**A paraphrase alone is never proof-of-read.**
+
+---
+
+## Textual Source Sections
+
+For a textual source (a document, reference file, specification, or similar), proof-of-read requires:
+
+- **Source identity** — the filename, path, URL, or Project Source identifier of the file that was inspected
+- **Exact section heading as written** — copied verbatim from the source, not inferred
+- **Exact first 5 words of the inspected section** — the first five words of the section body, not the heading
+- **Exact last 5 words of the inspected section** — the last five words of the section body
+- **Location markers if available** — line numbers, byte ranges, page numbers, chunk identifiers, or file paths
+
+<Info>
+If the section has fewer than 10 words, quote the entire section verbatim rather than providing first/last 5 words.
+</Info>
+
+These fields together constitute a mechanical fingerprint that cannot be produced without reading the actual file. They ensure the content claimed as L0 evidence was genuinely inspected in the current task.
+
+---
+
+## Structured or Non-Text Sources
+
+For structured sources (JSON, YAML, TOML, CSV spreadsheets, schemas, databases, or similar), proof-of-read requires:
+
+- **Source identity** — the filename, path, or identifier of the source that was inspected
+- **Exact top-level keys, sheet names, filenames, object identifiers, or schema paths** — copied verbatim from the inspected structure
+- **Hash if available** — a content hash anchors the proof to the specific version of the file that was read
+- **Retrieval failure if unavailable** — if the source could not be retrieved, that failure must be declared explicitly
+
+---
+
+## Failure Behavior
+
+If proof-of-read is unavailable for a required source, the protocol requires:
+
+1. **Treat the source as unavailable.** A source that cannot be mechanically verified has not been inspected, regardless of what the assistant recalls about its contents.
+2. **Block persistence.** Do not proceed with any write that depends on the unverified source.
+3. **Enter read-only mode for the target if necessary.** If the unverified source is required for safe writes to a particular artifact, that artifact becomes read-only until proof-of-read can be established.
+
+<Warning>
+Proof-of-read that cites a section only from memory — without actually inspecting the file in the current task — is not valid. If the assistant recalls the content of a source but did not retrieve and read it during the current session, that recall is L3 (model prior) and cannot serve as evidence. The mechanical inspection must occur in the current task.
+</Warning>
+
+---
+
+## Generating Proof-of-Read Mechanically
+
+The [`scripts/extract_proof.py`](/scripts/extract-proof) script is available to generate proof-of-read records mechanically from inspected files. When the script is available and the task touches state, recovery, proof-of-read, or file promotion, use it before marking output `[SAFE TO SAVE]`. The script produces the required fields — source identity, section heading, first/last words, and location markers — from the actual file contents, removing the possibility of memory substitution.
+
+When the script is not available, proof-of-read must be assembled manually from the live retrieval output of the file inspection tool used in the current task.
+
+---
+
+## Valid Proof-of-Read Example
+
+The following is a well-formed proof-of-read record for a textual source section:
+
+<Accordion title="Example: Proof-of-read for a textual source">
+
+```text
+Source identity:   canon-boundary-guard-gpt/references/protocol.md
+Section heading:   ## Rules
+First 5 words:     Preserve or reorganize L0.
+Last 5 words:      surface it before writing.
+Location markers:  lines 47–55
+```
+
+This record is valid because:
+- The source identity names the specific file path that was inspected.
+- The section heading is copied verbatim from the file.
+- The first and last five words are exact — not paraphrased — and can be verified by re-reading the file.
+- Line numbers are provided as location markers.
+
+A record that reads "the Rules section lists seven rules about preserving L0 and not persisting L1" is **not** valid proof-of-read — it is a paraphrase and cannot confirm that the file was inspected.
+
+</Accordion>
+
+---
+
+## Proof-of-Read in the Bootstrap Flow
+
+During the mandatory re-entry bootstrap, proof-of-read is implicitly required for each file listed in the Status Check. The bootstrap sources — `SKILL.md`, `references/protocol.md`, `references/gpt-project-adapter.md`, and the latest `SESSION_STATE` — must be actively inspected through Project Source retrieval or `/mnt/data` file access. Declaring that bootstrap completed without providing retrievable evidence of inspection does not satisfy the requirement.

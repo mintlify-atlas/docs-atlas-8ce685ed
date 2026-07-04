@@ -1,0 +1,143 @@
+---
+title: "Operating Modes: Mode A, B, and C Explained"
+sidebarTitle: "Operating Modes"
+description: "How Canon Boundary Guard's three operating modes — mechanical edit, semantic reorganization, and promotion — determine when ChatGPT should proceed, pause, or stop entirely."
+---
+
+Canon Boundary Guard defines three operating modes that govern how the assistant should behave when producing output that could persist. The modes are not styles of communication — they are provenance-driven gates. Which mode applies depends entirely on the source class of the material being operated on, not on how complex or important the task feels. Mode A lets the assistant proceed silently. Mode B requires a compact accounting. Mode C requires the assistant to stop and surface a full dossier before writing anything.
+
+---
+
+## Mode A — Mechanical Edit with Clear L0 Provenance
+
+Mode A applies when the operation is purely mechanical and every piece of material involved has clear, inspected L0 provenance. No dossier is required. The assistant proceeds silently.
+
+**What qualifies as Mode A:**
+
+- Reformatting a code file that is already a Project Source, with no semantic changes
+- Renaming a symbol according to a naming rule that is itself grounded in an inspected L0 document
+- Fixing a syntax error identified by a diagnostic
+- Sorting or deduplicating entries in a lockfile or schema that was inspected in the current task
+- Updating a comment to match what the code already does, where both the comment and the code are L0
+
+**The key test:** could the operation be described as "I looked at the file, I found the mechanical issue, I corrected it"? If yes, and if no new claims, rules, versions, or decisions are introduced, it is Mode A.
+
+<Note>
+  Scratch operations inside `/mnt/data/scratch/**` default to Mode A without requiring a dossier. The scratch zone is disposable and non-canon by definition. Material produced there does not need gate treatment unless it is later promoted toward a canon or final destination, at which point the promotion step itself requires gate treatment.
+</Note>
+
+---
+
+## Mode B — Semantic Reorganization of Existing L0
+
+Mode B applies when the operation reorganizes, restructures, or reinterprets existing L0 evidence — but does not introduce material from L1, L1A, L2, or L3. The work is still grounded in inspected sources, but it involves semantic judgement rather than purely mechanical transformation.
+
+**What qualifies as Mode B:**
+
+- Extracting a reusable interface from a file that is L0, where the structure of the extraction reflects a design decision
+- Merging two L0 documents into a single canonical reference, choosing what to keep
+- Rewriting prose in an L0 spec for clarity, where the meaning changes slightly
+- Reorganizing a workflow document whose source is L0
+
+**Compact dossier:** When a Mode B operation involves persistence, a compact dossier is required. It does not need every field of the full dossier — a brief statement of the target, the L0 sources involved, and what semantic judgement was applied is sufficient. The compact dossier makes the reorganization visible and reviewable without blocking the work.
+
+**Compact dossier example:**
+
+```text
+Target: references/api-overview.md
+Mode: B
+Evidence: references/api-v2.md (L0, inspected), references/api-v1-archive.md (L0, inspected)
+Semantic judgement: merged endpoint list from both files; v2 takes precedence on conflicts
+```
+
+---
+
+## Mode C — Promotion of L1, L1A, L2, or L3 into Persistent Content
+
+Mode C applies whenever any material from L1 (conversation), L1A (approved delta), L2 (agent-control instructions), or L3 (model prior) would enter a persistent output. This is the highest-risk class of operation. The assistant must stop before writing and produce a full dossier. It must not proceed unless the operator explicitly authorizes the promotion.
+
+**What triggers Mode C:**
+
+- A chat message or brainstorming thread is being turned into a spec or policy
+- A preference stated in conversation is becoming a workflow rule
+- A model-assumed best practice is being written into an architecture document
+- A recovery draft not yet canonized is being promoted to a Project Source
+- Project Instructions are being updated based on L1 conversation material
+
+**Full dossier format:**
+
+```text
+Target:
+Mode:
+Evidence:
+Authorized delta:
+Rejected shaping:
+Rejected model prior:
+Conflicts:
+Decision needed:
+```
+
+Write `none` when a field is empty. Do not invent rejected items — if nothing was rejected, write `none`.
+
+**Full dossier example:**
+
+```text
+Target: docs/naming-conventions.md (new Project Source)
+Mode: C
+Evidence: src/components/ (L0, inspected — existing naming patterns)
+Authorized delta: operator approved "use kebab-case for all component filenames" in this turn [L1A]
+Rejected shaping: "we always do it this way" — not grounded in L0 [L3 rejected]
+Rejected model prior: "React community standard is PascalCase for files" — not verified in L0 [L3 rejected]
+Conflicts: existing files use mixed casing; new rule would require migration
+Decision needed: confirm scope — apply to new files only or require migration of existing files?
+```
+
+The dossier surfaces exactly what is being promoted, what was rejected, and what the operator needs to decide before the write proceeds.
+
+---
+
+## Decision Flow
+
+Use this flow at the start of any operation that could produce persistent output:
+
+<Steps>
+  <Step title="Identify the target">
+    What is being produced? Is it a scratch artifact, a final artifact, a Project Source candidate, a state file, a Canvas output, or a conversational reply? If it is a conversational reply with no persistence trigger, no gate is needed.
+  </Step>
+  <Step title="Classify the source material">
+    What is the provenance of every claim, rule, name, version, and decision in the output? Assign each to L0, L1, L1A, L2, or L3. See [Source Classes](/concepts/source-classes) for the full definitions.
+  </Step>
+  <Step title="Check for L1/L1A/L2/L3 presence">
+    If any non-L0 material would enter the persistent output, the operation is Mode C. Stop. Produce the full dossier. Wait for explicit operator authorization before writing.
+  </Step>
+  <Step title="Check for semantic judgement">
+    If all material is L0 but the operation involves a design or organizational decision — not just a mechanical correction — the operation is Mode B. Produce a compact dossier if persistence is involved, then proceed.
+  </Step>
+  <Step title="Confirm mechanical L0 operation">
+    If all material is L0 and the operation is purely mechanical with no new claims or decisions, the operation is Mode A. Proceed silently.
+  </Step>
+  <Step title="Apply save label">
+    After the gate passes, apply the appropriate save label deterministically based on the content type. Only mark `[SAFE TO SAVE]` when the simulated gate passed. Mark `[DO NOT SAVE - L1/L3 PRESENT]` when non-L0 material remains in the output without explicit authorization.
+  </Step>
+</Steps>
+
+---
+
+## Full Dossier Reference
+
+The full dossier is required for every Mode C operation. Each field must be present; write `none` when a field has no content.
+
+```text
+Target:           The file path, artifact name, or resource being written or updated
+Mode:             C (always C for full dossier)
+Evidence:         L0 sources inspected, with path and inspection note
+Authorized delta: What the operator explicitly approved this turn [L1A scope]
+Rejected shaping: L1 material present in the draft that was excluded
+Rejected model prior: L3 material present in the draft that was excluded
+Conflicts:        Contradictions between sources or between sources and the proposed output
+Decision needed:  What the operator must confirm before the write can proceed
+```
+
+<Info>
+  The dossier is not a bureaucratic form — it is a communication tool. Its purpose is to make visible exactly what is being promoted, what was identified and rejected, and what the operator needs to decide. A dossier that accurately describes a simple promotion can be short. A dossier that accurately describes a complex one must be complete.
+</Info>

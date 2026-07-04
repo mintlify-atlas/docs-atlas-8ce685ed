@@ -1,0 +1,125 @@
+---
+title: "Scratch and Canon Zones: /mnt/data Runtime Layout"
+sidebarTitle: "Scratch & Canon"
+description: "How Canon Boundary Guard partitions /mnt/data into a disposable scratch zone and a guarded canon zone, and what rules govern promotion between them."
+---
+
+Canon Boundary Guard divides the `/mnt/data` runtime into two distinct zones with fundamentally different status: a disposable scratch zone where work happens freely, and a guarded canon zone where content may only land after passing the simulated gate. This two-zone model exists because ChatGPT's file operations are otherwise flat — without an explicit partition and enforced boundary, there is no structural difference between "I wrote this as a working note" and "this is a project artifact." The scratch/canon split makes that distinction physical and enforceable.
+
+## Runtime Zone Layout
+
+| Path | Status | Gate Required |
+|---|---|---|
+| `/mnt/data/scratch/**` | Disposable, non-canon. Mode A by default. | No — scratch-to-scratch operations are free. |
+| `/mnt/data/canon/**` | Guarded candidate outputs. | Yes — gate required before creation or update. |
+| `/mnt/data/_SESSION_STATE.json` | Working state only. Not durable canon. | Gate required before export or Project Source save. |
+
+<Info>
+"Non-canon" does not mean "unimportant" — scratch files can represent significant work. It means scratch files carry **no evidentiary status** in the protocol. A scratch file is not L0 evidence, cannot be cited as an authorized project decision, and cannot be presented as a final output without passing through the gate.
+</Info>
+
+## Source-Staged Extraction Exception
+
+When the Canon Boundary Guard bundle (or any other project source) is distributed as a zip and extracted into `/mnt/data`, the extracted files are scratch artifacts by default. However, there is a narrow exception for **source-staged extraction**:
+
+A source-staged extraction of an uploaded or Project Source zip may support L0 inspection — but **only as a mechanical view of that specific source**, anchored to the source identity or hash of the zip it came from. This means:
+
+- The extracted files inherit L0 status only for the surfaces actively inspected, not for the entire extracted tree.
+- Before treating any extracted surface as L0, the source zip path or Project Source ID — and the hash, if available — must be recorded.
+- If the source identity or hash is unavailable, the missing anchor must be declared, and L0 status is limited to the inspected extracted path with a risk note attached.
+- Assistant-generated scratch outputs written during the session remain non-evidence regardless of whether the session began with a source-staged extraction.
+
+## Allowed Scratch Uses
+
+The following operations are permitted freely inside `/mnt/data/scratch/**` without triggering the gate:
+
+- **Temporary extraction** — unpacking archives to inspect their contents
+- **Parsing** — reading and processing structured or semi-structured content
+- **Calculations** — numerical, logical, or structural computations
+- **Tests** — exploratory or validation runs with no promotion intent
+- **Drafts** — in-progress versions of content being developed
+- **Intermediate transforms** — reshaping or converting content between steps
+- **Staging files before inspection** — holding content temporarily before a gate-governed review
+
+## Promotion Boundary
+
+Promotion is any operation that moves content — directly or by reference — out of scratch and into a context where it carries evidentiary or deliverable weight. Promotion is not limited to filesystem moves. The following operations all constitute promotion and require gate classification:
+
+- Copying content from a scratch file into a new output
+- Summarizing a scratch artifact as a final result
+- Exporting a scratch file as a downloadable artifact
+- Citing a scratch file's content in a decision or specification
+- Embedding scratch content in a response intended for saving
+- Presenting scratch content as final or authoritative
+- Saving scratch content as a downloadable artifact
+- Saving scratch content as a Project Source
+- Including scratch files in an archive or bundle
+- Rendering scratch content into a Canvas or final document
+
+**Promotion rules:**
+
+| Operation | Gate Required |
+|---|---|
+| scratch → scratch | No — free |
+| scratch → `/mnt/data/canon/**` | Yes |
+| scratch → response intended for save | Yes |
+| scratch → Project Source | Yes |
+
+## Forbidden Direct Promotions
+
+The following filesystem operations are forbidden as direct promotion paths. None of them constitute a valid gate passage — they bypass the classification, dossier, and authorization steps entirely:
+
+- `os.rename`
+- `shutil.move`
+- `shutil.copy`
+- `cp`
+- `mv`
+- `rsync`
+- Any `zip` or `tar` creation that includes scratch files as final outputs
+- Any script that bulk-copies scratch outputs into canon paths without gate metadata
+
+These operations move bytes but do not confer canon status. Content moved this way remains L1 material — inspectable as evidence of its own contents, but not admitted as an authorized project artifact.
+
+## Allowed Promotion Path
+
+All promotions from scratch to canon must follow this sequence:
+
+<Steps>
+  <Step title="Inspect the scratch source">
+    Actively read the scratch file in the current task. Do not rely on memory of what was written earlier in the session. Record the source path and hash if available.
+  </Step>
+  <Step title="Classify the promotion as Mode A, B, or C">
+    Determine whether the promotion is a mechanical L0 operation (Mode A), a semantic reorganization of L0 content (Mode B), or an introduction of L1, L1A, L2, or L3 material into a persistent artifact (Mode C). See [Operating Modes](/concepts/operating-modes) for classification criteria.
+  </Step>
+  <Step title="Produce the required dossier if Mode B or C">
+    Mode B requires a compact dossier. Mode C requires a full dossier and must stop before writing unless the operator has explicitly authorized the delta. For Mode C, the full dossier format is:
+
+    ```
+    Target:
+    Mode:
+    Evidence:
+    Authorized delta:
+    Rejected shaping:
+    Rejected model prior:
+    Conflicts:
+    Decision needed:
+    ```
+
+    Write `none` for any field that is empty. Do not invent rejected items.
+  </Step>
+  <Step title="Declare the target path">
+    State explicitly where the output will be written — the full `/mnt/data/canon/**` path or the final artifact destination. This declaration is part of the gate record.
+  </Step>
+  <Step title="Write a new output file after gate approval">
+    Write the output as a **new file** to `/mnt/data/canon/**` or the declared final destination. Do not rename, move, or copy the scratch source. The canon artifact is newly written content that may draw on the inspected scratch source as evidence.
+  </Step>
+  <Step title="Record the promotion in SESSION_STATE / CANON_STATE_DELTA">
+    Record the source path, target path, content hash (if available), and promotion reason in the working state. If this is a Mode B or Mode C decision, emit a `CANON_STATE_DELTA` block labeled `[STATE DELTA - SAVE/PASTE ONLY AS RECOVERY MATERIAL]`.
+  </Step>
+</Steps>
+
+<Warning>
+**No scratch artifact becomes canon by relocation. Canon artifacts are newly written after gate approval.**
+
+Renaming or moving a scratch file into `/mnt/data/canon/**` does not make it canon. The path changes; the provenance does not. Canon status is conferred by the gate process — classification, dossier, authorization, and a new write — not by filesystem location.
+</Warning>

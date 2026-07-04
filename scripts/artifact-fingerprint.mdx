@@ -1,0 +1,105 @@
+---
+title: "artifact_fingerprint.py: File Size, Mtime, and SHA-256"
+sidebarTitle: "artifact_fingerprint.py"
+description: "Emit path, size, mtime, and SHA-256 fingerprints for files or directories. Use to anchor source identity before treating extracted surfaces as L0."
+---
+
+`artifact_fingerprint.py` produces a JSON array of mechanical fingerprints for
+one or more files or directories. For each path it emits the absolute path,
+existence flag, file/directory type, size in bytes, last-modified time in UTC
+ISO-8601 format, and a SHA-256 hex digest. Fingerprinting is the recommended
+first step when a bundle zip arrives in `/mnt/data` — recording the hash before
+extraction anchors the source identity required for treating extracted surfaces
+as L0. The script does not classify provenance; it only records facts about the
+file system.
+
+## Usage
+
+```bash
+# Fingerprint a single file
+python scripts/artifact_fingerprint.py /path/to/file.json
+
+# Fingerprint multiple files and a directory
+python scripts/artifact_fingerprint.py /path/to/file1 /path/to/file2 /path/to/dir
+
+# Fingerprint a zip with 4-space JSON indentation
+python scripts/artifact_fingerprint.py /path/to/file.zip --indent 4
+```
+
+## Arguments
+
+<ParamField path="paths" type="Path (one or more, positional)">
+  One or more files or directories to fingerprint. Each path is processed
+  independently. Directories receive size and mtime but no SHA-256 (hashing is
+  file-only).
+</ParamField>
+
+<ParamField path="--indent" type="int" default="2">
+  JSON indentation level for the output array. Defaults to `2`. Pass `0` for
+  compact single-line output.
+</ParamField>
+
+## Output
+
+The script prints a single JSON array to stdout. Each element corresponds to one
+input path.
+
+**When the path exists and is a file:**
+
+```json
+[
+  {
+    "path": "/mnt/data/canon-boundary-guard-gpt.zip",
+    "exists": true,
+    "is_file": true,
+    "is_dir": false,
+    "size_bytes": 14823,
+    "mtime_utc": "2025-05-23T17:38:50+00:00",
+    "sha256": "a3f5..."
+  }
+]
+```
+
+**When the path does not exist**, only `path` and `exists: false` are included:
+
+```json
+[
+  {
+    "path": "/mnt/data/missing.zip",
+    "exists": false
+  }
+]
+```
+
+**When the path is a directory**, `sha256` is omitted; all other fields are
+present.
+
+### Field reference
+
+| Field | Type | Description |
+|---|---|---|
+| `path` | string | The path as passed on the command line |
+| `exists` | boolean | Whether the path exists on the file system |
+| `is_file` | boolean | `true` when the path is a regular file |
+| `is_dir` | boolean | `true` when the path is a directory |
+| `size_bytes` | integer | File or directory size from `stat` |
+| `mtime_utc` | string | Last-modified time as UTC ISO-8601 with timezone offset |
+| `sha256` | string | Full SHA-256 hex digest, present for files only |
+
+## How it fits the protocol
+
+The `sha256` value serves as the **source identity anchor** required when
+treating source-staged extractions as L0. Before a bundle zip is extracted, the
+protocol requires recording the source zip path and hash — if no anchor is
+available, L0 must be limited to the inspected path with a risk note. Running
+`artifact_fingerprint.py` on the zip before extraction produces a
+machine-readable record that satisfies this requirement. Store the output
+alongside `SESSION_STATE` or include the hash in `active_l0_sources` when
+initialising state.
+
+<Tip>
+  Run this script on the bundle zip **before** extracting it, to record the
+  source anchor in `SESSION_STATE`. A fingerprint taken after extraction still
+  identifies the zip, but recording it first removes any ambiguity about which
+  file was the extraction source.
+</Tip>

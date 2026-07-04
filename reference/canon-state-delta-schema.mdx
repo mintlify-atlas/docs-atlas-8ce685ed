@@ -1,0 +1,261 @@
+---
+title: "CANON_STATE_DELTA Schema Reference"
+sidebarTitle: "CANON_STATE_DELTA"
+description: "Full field-by-field reference for CANON_STATE_DELTA snapshot blocks — the self-contained recovery checkpoints emitted after every Mode B/C decision."
+---
+
+A `CANON_STATE_DELTA` is a self-contained snapshot delta emitted by the model after every Mode B or Mode C state-changing decision. Unlike a simple diff, a valid `CANON_STATE_DELTA` always includes a complete `current_state` object — the full SESSION_STATE as it stands after the decision. This design is intentional: differential-only deltas (those that record only what changed) are **not valid recovery material**, because they cannot restore working state on their own without access to every prior delta in the chain. A CANON_STATE_DELTA must be usable in isolation, with nothing but the block itself.
+
+## Minimal example
+
+```json
+{
+  "type": "CANON_STATE_DELTA",
+  "seq": 1,
+  "timestamp": "2025-01-15T14:10:00Z",
+  "basis": {
+    "previous_seq": 0,
+    "previous_hash": "sha256:a3f2e1b4c9d7e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5"
+  },
+  "decision": {
+    "mode": "B",
+    "summary": "Operator authorized addition of authentication module scaffold",
+    "authorized_delta": "Add authentication module scaffold to project source",
+    "affected_targets": ["src/auth/index.ts"]
+  },
+  "current_state": {
+    "protocol": "canon-boundary-guard:gpt-project-adapter",
+    "protocol_version": "1.1",
+    "state_seq": 1,
+    "updated_at": "2025-01-15T14:10:00Z",
+    "active_l0_sources": [
+      {
+        "source_id": "canon-boundary-guard-gpt/SKILL.md",
+        "source_type": "project_source",
+        "status": "inspected"
+      }
+    ],
+    "authorized_deltas": [
+      {
+        "delta_id": "delta-001",
+        "authorized_at": "2025-01-15T14:10:00Z",
+        "scope": "Add authentication module scaffold to project source",
+        "status": "pending_persistence",
+        "target": "src/auth/index.ts"
+      }
+    ],
+    "open_conflicts": [],
+    "pending_decisions": [],
+    "last_persistent_artifacts": []
+  },
+  "operator_action_required": "Download or copy this delta. Re-upload at next session start or paste into chat to restore working state."
+}
+```
+
+---
+
+## Required fields
+
+<ResponseField name="type" type="string" required>
+  Marker identifying this JSON object as a delta block. Must be the constant string `"CANON_STATE_DELTA"`. Any block that lacks this field or uses a different value must not be used as a recovery source.
+</ResponseField>
+
+<ResponseField name="seq" type="integer" required>
+  Sequence number of this delta. Minimum value is `1`. **Must equal `current_state.state_seq`** — the validator rejects any delta where these two values disagree. See [key invariant](#key-invariant) below.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string" required>
+  ISO-8601 timestamp recording when this delta was created, i.e., when the state-changing decision was processed.
+</ResponseField>
+
+<ResponseField name="basis" type="object" required>
+  Reference to the previous state that this delta was applied on top of.
+
+  <Expandable title="basis fields">
+    <ResponseField name="previous_seq" type="integer" required>
+      The `state_seq` of the state that existed immediately before this delta. Minimum value is `0`. Together with `previous_hash`, this lets a validator confirm that deltas form an unbroken chain.
+    </ResponseField>
+
+    <ResponseField name="previous_hash" type="string">
+      Optional. SHA-256 hash of the serialized previous SESSION_STATE object. Format: `"sha256:<hex>"`. When present, `validate_state.py` verifies the hash against the prior state to detect tampering or accidental mutation.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="decision" type="object" required>
+  The decision that produced this delta — what the operator authorized, under which operating mode, and what was affected.
+
+  <Expandable title="decision fields">
+    <ResponseField name="mode" type="string enum" required>
+      The operating mode under which the decision was made. Allowed values:
+
+      | Value | Meaning |
+      |---|---|
+      | `B` | Mode B — operator-authorized action with gate confirmation |
+      | `C` | Mode C — full persistence gate, artifact written to durable storage |
+    </ResponseField>
+
+    <ResponseField name="summary" type="string" required>
+      Human-readable description of what was decided. Written in plain language so an operator reading a pasted delta block can understand what happened without additional context.
+    </ResponseField>
+
+    <ResponseField name="authorized_delta" type="string" required>
+      The specific scope of what was authorized — the exact change permitted by the operator's decision. Corresponds to the `scope` field of the matching entry in `current_state.authorized_deltas`.
+    </ResponseField>
+
+    <ResponseField name="affected_targets" type="array of strings" required>
+      List of file paths, Project Source labels, or artifact identifiers modified by this decision. Must be non-empty for any Mode B or Mode C delta.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="current_state" type="object" required>
+  Full SESSION_STATE object representing the complete state of the session **after** this delta was applied. Must validate against `SESSION_STATE.schema.json` in its entirety — all required fields, all array item schemas, and the constant `protocol` and `protocol_version` values. See the [SESSION_STATE schema reference](/reference/session-state-schema) for the full field list.
+
+  <Note>
+    `current_state` is a complete snapshot, not a diff. Every field the SESSION_STATE schema requires must be present, even fields that did not change in this delta. This is what makes the block usable as a standalone recovery source.
+  </Note>
+</ResponseField>
+
+<ResponseField name="operator_action_required" type="string" required>
+  Plain-language instruction telling the operator what to do with this delta to make the state change durable. For example: download the block, re-upload it at next session start, or paste it into chat to restore working state.
+</ResponseField>
+
+---
+
+## Key invariant
+
+<Warning>
+  `current_state.state_seq` MUST equal `delta.seq`. The `validate_state.py` script checks this invariant explicitly and rejects any delta where the two values disagree. A mismatch indicates the delta was assembled incorrectly or tampered with after emission.
+</Warning>
+
+The sequence equality rule exists because `seq` is the external, chainable identifier for this delta, while `current_state.state_seq` is the internal, schema-validated sequence number embedded in the full state. If they could diverge, a chain of deltas could become internally inconsistent — a delta could claim to be step 5 in the chain while its embedded state claims to be step 3.
+
+---
+
+## Using a CANON_STATE_DELTA for recovery
+
+When valid SESSION_STATE is unavailable at session start (for example, because the ephemeral `/mnt/data/` storage was cleared), paste a previously emitted `CANON_STATE_DELTA` block into the chat. The model will:
+
+1. Parse the block and confirm `type === "CANON_STATE_DELTA"`.
+2. Validate the embedded `current_state` against `SESSION_STATE.schema.json`.
+3. Confirm that `current_state.state_seq === delta.seq`.
+4. If validation passes, restore working state from `current_state` and continue.
+5. If validation fails, reject the block as a recovery source and enter read-only mode.
+
+See [State and Recovery](/usage/state-and-recovery) for the full recovery procedure, including what is permitted and forbidden during read-only mode.
+
+---
+
+## Validation
+
+Run `scripts/validate-state` with the `--delta` flag:
+
+```bash
+python scripts/validate_state.py --delta CANON_STATE_DELTA.json
+```
+
+The script checks:
+- `type` is `"CANON_STATE_DELTA"`
+- `seq` is an integer ≥ 1
+- `basis.previous_seq` is an integer ≥ 0
+- `decision.mode` is `"B"` or `"C"`
+- `current_state` validates fully against `SESSION_STATE.schema.json`
+- `current_state.state_seq === delta.seq`
+- When `basis.previous_hash` is present, it matches the hash of the serialized prior state
+
+<Warning>
+  Differential-only deltas (that omit `current_state`) are not valid recovery material and will be rejected by `validate_state.py`.
+</Warning>
+
+---
+
+## Complete valid example
+
+```json
+{
+  "type": "CANON_STATE_DELTA",
+  "seq": 3,
+  "timestamp": "2025-01-15T14:32:00Z",
+  "basis": {
+    "previous_seq": 2,
+    "previous_hash": "sha256:b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5"
+  },
+  "decision": {
+    "mode": "C",
+    "summary": "Operator authorized update to README with setup instructions; written as Project Source",
+    "authorized_delta": "Update README.md with setup instructions",
+    "affected_targets": ["README.md"]
+  },
+  "current_state": {
+    "protocol": "canon-boundary-guard:gpt-project-adapter",
+    "protocol_version": "1.1",
+    "state_seq": 3,
+    "updated_at": "2025-01-15T14:32:00Z",
+    "active_l0_sources": [
+      {
+        "source_id": "canon-boundary-guard-gpt/SKILL.md",
+        "source_type": "project_source",
+        "status": "inspected"
+      },
+      {
+        "source_id": "canon-boundary-guard-gpt/references/protocol.md",
+        "source_type": "project_source",
+        "status": "inspected"
+      },
+      {
+        "source_id": "canon-boundary-guard-gpt/schemas/SESSION_STATE.schema.json",
+        "source_type": "project_source",
+        "status": "inspected"
+      },
+      {
+        "source_id": "_SESSION_STATE.json",
+        "source_type": "state_file",
+        "status": "inspected",
+        "notes": "Recovered from prior session CANON_STATE_DELTA"
+      }
+    ],
+    "authorized_deltas": [
+      {
+        "delta_id": "delta-001",
+        "authorized_at": "2025-01-15T14:10:00Z",
+        "scope": "Add authentication module scaffold to project source",
+        "status": "persisted",
+        "target": "src/auth/index.ts"
+      },
+      {
+        "delta_id": "delta-002",
+        "authorized_at": "2025-01-15T14:28:00Z",
+        "scope": "Update README with setup instructions",
+        "status": "persisted",
+        "target": "README.md"
+      },
+      {
+        "delta_id": "delta-003",
+        "authorized_at": "2025-01-15T14:32:00Z",
+        "scope": "Update README.md with setup instructions",
+        "status": "persisted",
+        "target": "README.md"
+      }
+    ],
+    "open_conflicts": [],
+    "pending_decisions": [],
+    "last_persistent_artifacts": [
+      {
+        "artifact_id": "artifact-001",
+        "artifact_type": "project_source",
+        "created_at": "2025-01-15T14:12:00Z",
+        "path_or_label": "src/auth/index.ts"
+      },
+      {
+        "artifact_id": "artifact-002",
+        "artifact_type": "project_source",
+        "created_at": "2025-01-15T14:32:00Z",
+        "path_or_label": "README.md"
+      }
+    ],
+    "last_state_hash": "sha256:b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5"
+  },
+  "operator_action_required": "Copy this block and paste it at the start of your next session to restore working state, or download it for archival."
+}
+```

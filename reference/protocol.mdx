@@ -1,0 +1,199 @@
+---
+title: "Protocol Reference: Provenance Rules and Dossier Format"
+sidebarTitle: "Protocol"
+description: "Complete technical reference for Canon Boundary Guard provenance layers, persistence rules, dossier format, inline tagging, and decontamination patterns."
+---
+
+The Canon Boundary Guard protocol classifies provenance before information enters persistent project content. It does not decide what is canon — it makes visible what class of evidence is being used and where it is going. Every piece of content that moves toward a durable artifact carries a declared source layer, and that layer determines what rules apply before the write is allowed to proceed.
+
+## Source Layers
+
+The protocol defines five source layers. Each layer represents a distinct class of evidence with its own persistence permissions.
+
+### L0 — Inspected Evidence
+
+Persistent or verified evidence actively inspected in the current task:
+
+- Project files or sources
+- Local files
+- Git state
+- Tests
+- Schemas
+- Lockfiles
+- Diagnostics
+- Command output
+- Tool output
+- Verified external sources
+- Durable state files explicitly exported, re-uploaded, or saved and inspected
+- Canon artifacts created through the gate and later inspected
+
+<Note>
+A Project Source is L0 **only for the relevant surface inspected in the current task**. Presence in Project Sources is not evidence by itself.
+</Note>
+
+### L1 — Shaping
+
+Conversation material not explicitly approved as a durable project decision:
+
+- Current chat
+- Prior project chats
+- Moved chats
+- Brainstorming
+- Preferences not approved as protocol
+- Assistant analysis
+- Project memory
+- Recovery text not yet canonized
+
+L1 must not be persisted. It is the default classification for anything that arrived through conversation and has not been authorized for promotion.
+
+### L1A — Authorized Delta
+
+Conversation material the operator explicitly approved for persistence in the current turn. Authorization applies only to the stated scope. L1A becomes evidence only after it is written to a persistent artifact and later inspected — the authorization itself does not elevate it to L0.
+
+### L2 — Agent Control
+
+Instructions, steering, reminders, or constraints that shape assistant behavior. L2 is not project content. Persist it only if the operator explicitly requests agent-facing operating instructions.
+
+### L3 — Model Prior
+
+Unverified model memory, generic best practice, assumed framework behavior, version claims, or unstated conventions not grounded in inspected evidence. L3 must not be persisted unless verified or explicitly operator-approved.
+
+---
+
+## Rules
+
+The protocol enforces seven rules that govern how each layer may flow into persistent content:
+
+1. **Preserve or reorganize L0.** Inspected evidence may be preserved or reorganized without a dossier when the operation is purely mechanical.
+2. **Write L1A only within the explicitly approved scope.** Authorization does not extend beyond the stated delta.
+3. **Do not persist L1.** Conversation material, project memory, and unapproved preferences are not written to durable artifacts.
+4. **Do not persist L2 unless explicitly requested as agent-facing instruction.** Agent-control material is not project content.
+5. **Do not persist L3 unless verified or operator-approved.** Model priors and assumed conventions require explicit authorization before they enter canon.
+6. **If evidence conflicts, stop and report. Do not resolve by recency, confidence, or intuition.** Conflicting evidence is surfaced to the operator for a decision — it is never silently resolved.
+7. **If provenance is unclear, surface it before writing.** Ambiguous evidence is declared before a write proceeds, not after.
+
+---
+
+## Inline Tagging
+
+Tag inline when producing content that draws on non-L0 material. Tags mark the specific claim or term that would change if the source were different — not every word.
+
+| Tag | Meaning |
+|-----|---------|
+| `[L1]` | From conversation; not approved for persistence |
+| `[L1A]` | Approved this turn; pending persistence |
+| `[L2]` | Agent control; not project content |
+| `[L3]` | Model prior; unverified |
+
+Tag when the content is a:
+
+- Rule
+- Name
+- Version
+- Claim about behavior
+- Workflow expectation
+- Architecture decision
+
+Do not tag every word. The tag marks the claim, not the sentence.
+
+---
+
+## Modes
+
+Modes determine how much protocol machinery is required for a given operation. For full treatment of each mode, see [Operating Modes](/concepts/operating-modes).
+
+| Mode | Description |
+|------|-------------|
+| **Mode A** | Mechanical edit with clear L0 provenance. No dossier required. |
+| **Mode B** | Semantic edit reorganizing existing L0 evidence. Use a compact dossier if persistence is involved. |
+| **Mode C** | Promotion of L1, L1A, L2, or L3 into persistent content. Use a full dossier and stop before writing unless explicitly authorized. |
+
+---
+
+## Full Dossier Format
+
+Mode C operations require a full dossier. Mode B operations with persistence require a compact dossier (at minimum: Target, Mode, Evidence, and Authorized delta). The full dossier format is:
+
+```text
+Target:
+Mode:
+Evidence:
+Authorized delta:
+Rejected shaping:
+Rejected model prior:
+Conflicts:
+Decision needed:
+```
+
+**Field definitions:**
+
+- **Target** — The file, artifact, or surface being written to.
+- **Mode** — The operating mode (A, B, or C) for this operation.
+- **Evidence** — The L0 sources that were inspected and are being applied. List source identities.
+- **Authorized delta** — The L1A material explicitly approved by the operator for this turn, and the stated scope of that authorization.
+- **Rejected shaping** — L1 or L2 material that was present but excluded from the write. Write `none` if nothing was rejected.
+- **Rejected model prior** — L3 material that was present but excluded from the write. Write `none` if nothing was rejected.
+- **Conflicts** — Any evidence conflicts that were detected. Write `none` if there are no conflicts.
+- **Decision needed** — Questions requiring operator input before the write can proceed. Write `none` if no decision is needed.
+
+<Warning>
+Write `none` when a field is empty — do not leave fields blank or omit them. Do not invent rejected items. If no L1 or L3 material was present, write `none` in the rejected fields.
+</Warning>
+
+---
+
+## Decontamination
+
+Before persisting, flag and remove phrases that carry contaminated provenance. The following patterns indicate material that has not been verified against L0 and must not be written to durable content unless grounded in L0, explicitly approved as L1A, or intentionally written in a historical or migration context.
+
+### Conversation Residue
+
+Phrases that smuggle prior conversation into persistent content as if it were established fact:
+
+- `as discussed`
+- `as said before`
+- `from the previous session`
+- `come detto prima`
+- `come discusso`
+- `l'utente vuole`
+
+### Agent-Control Residue
+
+Phrases that embed behavioral steering into project content:
+
+- `remember to`
+- `I should`
+- `ricordati`
+- `devo`
+- `non devo`
+- Temporary instructions to the agent
+
+### Version Ghosts
+
+Version references not present in L0. If a version number or package name cannot be traced to an inspected file (lockfile, schema, config), it is a version ghost and must not be persisted.
+
+### Model-Prior Claims
+
+Language that presents unverified model assumptions as established fact:
+
+- `best practice`
+- `standard approach`
+- `recommended`
+- `modern convention`
+- `industry standard`
+- `normally`
+- `usually`
+
+### Filesystem Promotion Ghosts
+
+References to file operations that are not grounded in inspected state:
+
+- `copied from scratch`
+- `moved from scratch`
+- `renamed into canon`
+- `archived from scratch`
+- `included from scratch`
+
+<Tip>
+These phrases are allowed when grounded in L0, explicitly approved as L1A, or intentionally written in a historical or migration context — for example, a migration log that describes what was moved. The rule is against unverified claims appearing as present-tense project facts.
+</Tip>

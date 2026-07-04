@@ -1,0 +1,121 @@
+---
+title: "Session State, Snapshots, and Recovery Mode"
+sidebarTitle: "State & Recovery"
+description: "How Canon Boundary Guard tracks session state, emits recovery snapshots, and restores ChatGPT Project sessions from valid state without using chat memory."
+---
+
+ChatGPT Projects do not maintain durable in-context memory across sessions. Each new conversation starts without reliable knowledge of what was decided, what sources were inspected, or what canon artifacts were written in previous turns. In a long-running project — one with multiple sessions, evolving architecture, or accumulated authorized decisions — this creates a real risk: without explicit state tracking, ChatGPT cannot distinguish between an authorized architectural decision from three sessions ago and a preference mentioned once in chat. Canon Boundary Guard addresses this through explicit session state, snapshot deltas, and a structured recovery protocol that never reconstructs decisions from memory.
+
+## Working State
+
+The working state file is written to:
+
+```
+/mnt/data/_SESSION_STATE.json
+```
+
+This file holds the in-progress record of active L0 sources, authorized deltas, open conflicts, pending decisions, and the most recent persistent artifacts. It is updated after every Mode B or Mode C state-changing decision.
+
+<Note>
+The working state file is **not durable by itself**. It exists only within the current session's `/mnt/data` environment. To make state durable, you must explicitly export it through one of the following methods:
+
+- **Download and reupload** — download `_SESSION_STATE.json` at the end of a session and reupload it at the start of the next
+- **Save as Project Source** — save the state file explicitly as a Project Source through the simulated gate
+- **Use `CANON_STATE_DELTA` blocks** — paste a valid delta block at the start of a new session for recovery
+</Note>
+
+## SESSION_STATE Structure
+
+The schema-minimal shape of a valid `SESSION_STATE` is:
+
+```json
+{
+  "protocol": "canon-boundary-guard:gpt-project-adapter",
+  "protocol_version": "1.1",
+  "state_seq": 0,
+  "updated_at": "ISO-8601",
+  "active_l0_sources": [],
+  "authorized_deltas": [],
+  "open_conflicts": [],
+  "pending_decisions": [],
+  "last_persistent_artifacts": [],
+  "last_state_hash": "sha256:optional"
+}
+```
+
+Each field serves a specific role in the protocol:
+
+| Field | Purpose |
+|---|---|
+| `protocol` | Identifies the protocol variant. Must be `canon-boundary-guard:gpt-project-adapter`. |
+| `protocol_version` | Version string. Used to detect stale or incompatible state files. |
+| `state_seq` | Monotonically incrementing sequence number. Each state-changing write increments this value. |
+| `updated_at` | ISO-8601 timestamp of the last state write. |
+| `active_l0_sources` | List of file paths or source identifiers inspected in the current or most recent session that qualify as L0 evidence. Must not be empty after bootstrap. |
+| `authorized_deltas` | Record of L1A deltas explicitly authorized by the operator, scoped to their stated scope. |
+| `open_conflicts` | Unresolved evidence conflicts that have been surfaced but not decided. |
+| `pending_decisions` | Decisions that have been deferred or are awaiting operator input. |
+| `last_persistent_artifacts` | Paths and optional content hashes of the most recently written canon artifacts. |
+| `last_state_hash` | SHA-256 hash of the previous state, if available, for continuity verification. |
+
+The full schema is defined in `schemas/SESSION_STATE.schema.json`. If `scripts/validate_state.py` is available, use it to validate any state file before treating it as available.
+
+## CANON_STATE_DELTA
+
+After every Mode B or Mode C state-changing decision, Canon Boundary Guard emits a **`CANON_STATE_DELTA`** block. This is a self-contained snapshot delta that serves as portable recovery material — it can be copied, pasted, or stored outside the session and used to restore state in a future session.
+
+A valid `CANON_STATE_DELTA` must include:
+- Metadata (protocol identifier, version, sequence, timestamp)
+- Decision rationale describing what changed and why
+- A reference to the previous state, if available
+- A **full `current_state` object** that is itself a valid `SESSION_STATE`
+
+Differential-only deltas — those that record only the changes without embedding the full `current_state` — are **not valid recovery material**. They cannot be used to restore a session on their own.
+
+Validate deltas against `schemas/CANON_STATE_DELTA.schema.json`.
+
+## Recovery
+
+If a new session begins and no valid `SESSION_STATE` is available, Canon Boundary Guard enters **read-only recovery mode**. Recovery proceeds as follows:
+
+<Steps>
+  <Step title="Provide a valid recovery source">
+    Supply one of the following to initiate recovery:
+
+    - Upload a valid `SESSION_STATE.json` file (previously downloaded or saved from a prior session)
+    - Paste a `CANON_STATE_DELTA` block that contains a valid `current_state` object
+    - Have the operator explicitly authorize L1A reconstruction — a deliberate, scoped re-statement of prior decisions that the operator takes responsibility for, recorded as L1A material
+
+    If none of these sources are available, the session remains in read-only mode.
+  </Step>
+  <Step title="ChatGPT validates the recovery source">
+    ChatGPT inspects the provided source, validates it against the schema, checks the `state_seq` and `last_state_hash` if available, and confirms the `active_l0_sources` entries are coherent with the current project.
+
+    An invalid delta is rejected as a recovery source. It may be treated as L1 recovery text only — meaning it can inform the operator's decision about L1A reconstruction, but it does not itself restore state.
+  </Step>
+  <Step title="Session resumes from recovered state">
+    Once a valid recovery source is accepted, the `active_l0_sources`, `authorized_deltas`, `open_conflicts`, `pending_decisions`, and `last_persistent_artifacts` from the recovered state are loaded into the working session. The `state_seq` continues from the recovered value. Persistent operations may resume under normal gate rules.
+  </Step>
+</Steps>
+
+## Recovery Mode Restrictions
+
+While in read-only recovery mode (before a valid recovery source is accepted), the following operations are governed by strict rules:
+
+**Allowed in read-only recovery mode:**
+- Inspect Project Sources
+- Inspect uploaded files
+- List missing or unavailable state entries
+- Explain recovery options to the operator
+- Prepare a recovery plan
+
+**Forbidden in read-only recovery mode:**
+- Reconstruct state from chat memory or prior discussion
+- Infer approved decisions from conversational context
+- Write persistent artifacts
+- Mark any output `[SAFE TO SAVE]`
+- Perform Mode B or Mode C persistence operations
+
+<Warning>
+**Do not reconstruct state from chat memory.** Inferring what was "decided" from prior messages — even in the same Project — is a protocol violation. Chat history is L1 material. Only an explicitly uploaded `SESSION_STATE.json`, a valid `CANON_STATE_DELTA` block, or an operator-authorized L1A reconstruction may restore the session. Any other reconstruction silently promotes conversation residue into the canon record.
+</Warning>

@@ -1,72 +1,83 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "Canon Boundary Guard for GPT Projects",
+  "theme": "luma",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
-  },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "primary": "#5B47E0",
+    "light": "#EAE8FD",
+    "dark": "#2D2580"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/XxYouDeaDPunKxX/canon-boundary-guard-for-gpt-project"
     }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/XxYouDeaDPunKxX/canon-boundary-guard-for-gpt-project"
     }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "concepts/source-classes",
+              "concepts/operating-modes"
+            ]
+          },
+          {
+            "group": "Setup",
+            "pages": [
+              "setup/installation",
+              "setup/project-instructions",
+              "setup/bootstrap"
+            ]
+          },
+          {
+            "group": "Using the Frame",
+            "pages": [
+              "usage/simulated-gate",
+              "usage/save-labels",
+              "usage/state-and-recovery",
+              "usage/scratch-and-canon"
+            ]
+          },
+          {
+            "group": "Validators & Scripts",
+            "pages": [
+              "scripts/validate-state",
+              "scripts/artifact-fingerprint",
+              "scripts/extract-proof"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Protocol",
+            "pages": [
+              "reference/protocol",
+              "reference/proof-of-read",
+              "reference/gpt-project-adapter"
+            ]
+          },
+          {
+            "group": "Schemas",
+            "pages": [
+              "reference/session-state-schema",
+              "reference/canon-state-delta-schema"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

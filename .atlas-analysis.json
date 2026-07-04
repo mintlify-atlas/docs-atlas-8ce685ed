@@ -1,0 +1,95 @@
+{
+  "projectType": "general",
+  "projectName": "Canon Boundary Guard for GPT Projects",
+  "projectDescription": "A source-bundle protocol and prompt-engineering frame that keeps ChatGPT Projects from silently promoting chat messages, assumptions, and drafts into accepted project truth.",
+  "theme": "luma",
+  "primaryColor": "#5B47E0",
+  "lightColor": "#EAE8FD",
+  "darkColor": "#2D2580",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "concepts/source-classes",
+              "concepts/operating-modes"
+            ]
+          },
+          {
+            "group": "Setup",
+            "pages": [
+              "setup/installation",
+              "setup/project-instructions",
+              "setup/bootstrap"
+            ]
+          },
+          {
+            "group": "Using the Frame",
+            "pages": [
+              "usage/simulated-gate",
+              "usage/save-labels",
+              "usage/state-and-recovery",
+              "usage/scratch-and-canon"
+            ]
+          },
+          {
+            "group": "Validators & Scripts",
+            "pages": [
+              "scripts/validate-state",
+              "scripts/artifact-fingerprint",
+              "scripts/extract-proof"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Protocol",
+            "pages": [
+              "reference/protocol",
+              "reference/proof-of-read",
+              "reference/gpt-project-adapter"
+            ]
+          },
+          {
+            "group": "Schemas",
+            "pages": [
+              "reference/session-state-schema",
+              "reference/canon-state-delta-schema"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Provenance layering (L0–L3) that classifies evidence vs. conversation residue",
+    "Simulated PreToolUse gate at the semantic persistence boundary",
+    "Deterministic save labels: [SAFE TO SAVE], [DO NOT SAVE], [STATE DELTA], [DRAFT]",
+    "Session state tracking via SESSION_STATE.json with sequence numbers and active L0 sources",
+    "CANON_STATE_DELTA snapshots for durable, recoverable state hand-off",
+    "Scratch/canon runtime zone separation under /mnt/data",
+    "Optional Python validators: validate_state.py, artifact_fingerprint.py, extract_proof.py",
+    "Mechanical proof-of-read requirement before any persistent write",
+    "Read-only recovery mode when valid session state is unavailable"
+  ],
+  "publicApiSurface": [
+    "Source classes: L0, L1, L1A, L2, L3",
+    "Operating modes: Mode A, Mode B, Mode C",
+    "Save labels: [SAFE TO SAVE], [DO NOT SAVE - L1/L3 PRESENT], [STATE DELTA - SAVE/PASTE ONLY AS RECOVERY MATERIAL], [DRAFT - REQUIRES OPERATOR APPROVAL]",
+    "SESSION_STATE.json schema (protocol, protocol_version, state_seq, updated_at, active_l0_sources, authorized_deltas, open_conflicts, pending_decisions, last_persistent_artifacts)",
+    "CANON_STATE_DELTA schema (type, seq, timestamp, basis, decision, current_state, operator_action_required)",
+    "scripts/validate_state.py --state / --delta / --json",
+    "scripts/artifact_fingerprint.py <paths> [--indent]",
+    "scripts/extract_proof.py <path> [--heading] [--json]",
+    "Runtime zones: /mnt/data/scratch/**, /mnt/data/canon/**, /mnt/data/_SESSION_STATE.json",
+    "PROJECT_CUSTOM_INSTRUCTIONS.txt (Project instructions anchor)",
+    "canon-boundary-guard-gpt/ (source bundle)"
+  ]
+}

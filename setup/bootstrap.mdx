@@ -1,0 +1,96 @@
+---
+title: "Status Check: Bootstrap Sequence for New Sessions"
+sidebarTitle: "Bootstrap"
+description: "Understand the 10-step Status Check that ChatGPT runs before any substantive output to activate the Canon Boundary Guard frame."
+---
+
+Status Check is the mandatory bootstrap sequence that Canon Boundary Guard requires ChatGPT to run before the first substantive output in any new Project session. It is not a conversation step you initiate — the Project Instructions instruct ChatGPT to perform it automatically at the start of each chat. Status Check ensures that the frame is anchored to actively inspected source files rather than to prior chat memory, project memory, or model assumptions, and that session state is either confirmed or the missing-state condition is properly handled before any work begins.
+
+## The 10-step Status Check sequence
+
+<Steps>
+  <Step title="Locate the canon-boundary-guard-gpt/ bundle">
+    Search for the `canon-boundary-guard-gpt/` bundle in Project Sources or `/mnt/data`. The bundle may appear as an extracted folder or as the uploaded zip file. Confirming the bundle's location is the prerequisite for every subsequent inspection step.
+  </Step>
+
+  <Step title="Extract the zip if only a zip is available in /mnt/data">
+    If the bundle is present only as a zip file in `/mnt/data` — not yet extracted — extract it before bootstrap as a **source-staged extraction**. The extracted copy is not independently canon; it is a mechanical view of the source zip it came from.
+  </Step>
+
+  <Step title="Record source identity and hash for source-staged extraction">
+    If source-staged extraction was performed, record the source zip path or source id, and hash if available, before treating any extracted surface as `L0`. If source identity or hash is unavailable, declare the missing anchor, limit `L0` to the inspected extracted path, and attach a risk note to that classification.
+  </Step>
+
+  <Step title="Actively inspect SKILL.md">
+    Open and read `canon-boundary-guard-gpt/SKILL.md`. This is the primary skill definition and the first required bootstrap surface. Presence of the file in Project Sources does not count — active inspection of the file's contents in the current task is required for `L0` classification.
+  </Step>
+
+  <Step title="Actively inspect references/protocol.md">
+    Open and read `canon-boundary-guard-gpt/references/protocol.md`. This file defines the full provenance layer rules, dossier format, and contamination check requirements that govern all Mode B and Mode C operations.
+  </Step>
+
+  <Step title="Actively inspect references/gpt-project-adapter.md">
+    Open and read `canon-boundary-guard-gpt/references/gpt-project-adapter.md`. This file defines the simulated PreToolUse gate, the persistence boundary rules, runtime zone definitions (`/mnt/data/scratch/**`, `/mnt/data/canon/**`), and the deterministic save-label triggers specific to GPT Projects.
+  </Step>
+
+  <Step title="Inspect the latest SESSION_STATE.json if available">
+    Check whether a `SESSION_STATE.json` is available — either saved as a Project Source or uploaded in the current session. If found, inspect it to determine the current state sequence, active `L0` sources, authorized deltas, open conflicts, and pending decisions that carry over from the prior session.
+  </Step>
+
+  <Step title="Initialize working state only under first-install conditions">
+    If no `SESSION_STATE` exists, do **not** create one automatically. Initialize a new working state at `/mnt/data/_SESSION_STATE.json` only when the operator explicitly declares a fresh install, or when the current task is initial bundle installation and there is no prior-state claim. Initialize only after Status Check succeeds — meaning `references/state-and-recovery.md` and `schemas/SESSION_STATE.schema.json` have also been inspected in addition to the standard bootstrap surfaces. Register the inspected bootstrap surfaces in `active_l0_sources`; an empty `active_l0_sources` array after bootstrap is not valid first-install state.
+  </Step>
+
+  <Step title="Validate the working state with validate_state.py if available">
+    If `scripts/validate_state.py` is available in the bundle, run it against the created or loaded working state before treating that state as available for the session. The script validates `SESSION_STATE` and `CANON_STATE_DELTA` files against their schemas, using `jsonschema` when available and strict manual validation as a fallback. It is a mechanical helper — it does not make provenance decisions.
+  </Step>
+
+  <Step title="Do not assume gate mechanics from memory">
+    All gate rules, mode definitions, save-label triggers, source-class definitions, and persistence boundary conditions must be read from the inspected bundle sources in the current session. ChatGPT must not rely on prior chat context, model memory, or assumptions about how the frame works. If the bundle cannot be inspected, the frame is not active.
+  </Step>
+</Steps>
+
+## If inspection fails
+
+If the required bootstrap sources cannot be located or read during Status Check, Canon Boundary Guard enters **read-only mode** for the session. In read-only mode:
+
+- ChatGPT must not produce persistent outputs of any kind.
+- ChatGPT must not mark any output `[SAFE TO SAVE]`.
+- ChatGPT must not perform Mode B or Mode C operations.
+- ChatGPT must not write, update, or promote any file or artifact.
+
+Read-only mode allows ChatGPT to inspect available Project Sources, list missing state, explain the recovery options available, and prepare a recovery plan — but nothing more until the frame is restored through a valid recovery source.
+
+## First install vs. re-entry
+
+<Accordion title="First install: operator declares a fresh Project">
+  A first install occurs when the operator explicitly declares that this is a fresh install, or when the current task is the initial bundle installation itself and there is no prior-state claim of any kind.
+
+  **Bootstrap required sources for first install:**
+  - `canon-boundary-guard-gpt/SKILL.md`
+  - `canon-boundary-guard-gpt/references/protocol.md`
+  - `canon-boundary-guard-gpt/references/gpt-project-adapter.md`
+  - `canon-boundary-guard-gpt/references/state-and-recovery.md`
+  - `canon-boundary-guard-gpt/schemas/SESSION_STATE.schema.json`
+
+  Only after all five of these sources have been actively inspected and Status Check has succeeded may ChatGPT create the working state file at `/mnt/data/_SESSION_STATE.json`.
+
+  The created state must register the inspected bootstrap surfaces in `active_l0_sources`. A schema-minimal state with an empty `active_l0_sources` array is not valid first-install state. The initialized file is **working state only** — it is not durable canon. To make it durable, the operator must explicitly export it (download and re-upload) or save it as a Project Source through the simulated gate.
+</Accordion>
+
+<Accordion title="Re-entry without valid state: read-only recovery mode">
+  If this is not a fresh install and no valid `SESSION_STATE` is available at the start of the session, Canon Boundary Guard enters **read-only recovery mode** immediately.
+
+  In read-only recovery mode, ChatGPT must not reconstruct state from prior chat messages, prior project memory, or inference from conversation history. State reconstruction from chat is always forbidden regardless of how confident the reconstruction appears.
+
+  Recovery is only accepted from the following sources:
+  1. An uploaded `SESSION_STATE.json` file inspected in the current session.
+  2. A pasted `CANON_STATE_DELTA` block that includes a valid `current_state` object conforming to `SESSION_STATE.schema.json`.
+  3. Explicit operator reconstruction explicitly marked as `L1A` (operator-approved delta in the current turn).
+
+  Any delta that fails validation is rejected as a recovery source and treated as `L1` recovery text only.
+</Accordion>
+
+<Warning>
+  Never assume gate mechanics from memory. The rules for the simulated PreToolUse gate, mode classifications, save-label triggers, and source-class definitions must be read from the inspected bundle files in the current session. If ChatGPT skips Status Check and applies gate rules from prior context or model assumptions, it is operating outside the Canon Boundary Guard frame — and material may be silently promoted into canon without detection.
+</Warning>
